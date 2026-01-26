@@ -43,18 +43,41 @@ def format_number(value, default=0):
         return default
 
 def info_row(label, value):
-    """Small, clean label-value row (avoid st.metric big font)."""
     if value is None or (isinstance(value, float) and pd.isna(value)):
         value = "N/A"
+
     st.markdown(
         f"""
+        <style>
+        /* Light theme */
+        [data-theme="light"] .info-label {{
+            color: #6b7280;
+        }}
+        [data-theme="light"] .info-value {{
+            color: #111827;
+        }}
+
+        /* Dark theme */
+        [data-theme="dark"] .info-label {{
+            color: #9ca3af;
+        }}
+        [data-theme="dark"] .info-value {{
+            color: #e5e7eb;
+        }}
+        </style>
+
         <div style="margin: 6px 0 14px 0;">
-            <div style="font-size: 13px; color: #6b7280;">{label}</div>
-            <div style="font-size: 16px; font-weight: 500; color: #111827;">{value}</div>
+            <div class="info-label" style="font-size: 13px;">
+                {label}
+            </div>
+            <div class="info-value" style="font-size: 16px; font-weight: 500;">
+                {value}
+            </div>
         </div>
         """,
         unsafe_allow_html=True
     )
+
 
 def first_non_null(row, cols, default="N/A"):
     """Return the first non-empty value among cols."""
