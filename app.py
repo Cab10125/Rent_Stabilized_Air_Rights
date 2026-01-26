@@ -81,13 +81,27 @@ def load_data():
             bbl_10,
             borough_x,
             address_x,
+        
+            -- core metrics
             "new units",
             "new floors",
             "new building height",
+        
+            -- areas
+            resarea,
+            comarea,
+        
+            -- attributes
+            yearbuilt,
+            zonedist1,
+            bldgclass,
+            ownername,
+        
             new_units_capped,
             geom
         FROM gdf_merged
         WHERE geom IS NOT NULL
+
     """
 
     gdf = gpd.read_postgis(
@@ -101,17 +115,18 @@ def load_data():
         "bbl_10": "BBL_10",
         "borough_x": "Borough",
         "address_x": "Address",
+    
         "new units": "New Units",
         "new floors": "New Floors",
         "new building height": "New Building Height",
+    
         "resarea": "Residential Area",
-        "commarea": "Commercial Area",
+        "comarea": "Commercial Area",
         "yearbuilt": "Year Built",
         "zonedist1": "Zoning District 1",
         "bldgclass": "Building Class",
         "ownername": "Owner"
     })
-
 
     return gdf
 
