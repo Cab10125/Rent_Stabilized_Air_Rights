@@ -72,11 +72,9 @@ def first_non_null(row, cols, default="N/A"):
 @st.cache_data(show_spinner=True)
 def load_data():
     engine = create_engine(
-        "postgresql://nyc_rentstabilized_airrights_user:"
-        "Z08YucXA1MVD5kBghQcnlSoFQNCfwNv8"
-        "@dpg-d5ea8ap5pdvs73f8d3k0-a.virginia-postgres.render.com:5432"
-        "/nyc_rentstabilized_airrights"
+        os.environ["DATABASE_URL"]
     )
+
 
     query = """
         SELECT
