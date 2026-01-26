@@ -81,7 +81,7 @@ def load_data():
     query = """
         SELECT
             bbl_10,
-            borough,
+            borough_x,
             address_x,
             new_units,
             new_floors,
@@ -101,7 +101,7 @@ def load_data():
     # Key: map the columns on web dataset to the orignal columns
     gdf = gdf.rename(columns={
         "bbl_10": "BBL_10",
-        "borough": "Borough",
+        "borough_x": "Borough",
         "address_x": "Address",
         "new_units": "New Units",
         "new_floors": "New Floors",
