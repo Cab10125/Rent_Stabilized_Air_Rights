@@ -83,9 +83,9 @@ def load_data():
             bbl_10,
             borough_x,
             address_x,
-            new_units,
-            new_floors,
-            new_building_height,
+            "new units",
+            "new floors",
+            "new building height",
             new_units_capped,
             geom
         FROM gdf_merged
@@ -103,9 +103,9 @@ def load_data():
         "bbl_10": "BBL_10",
         "borough_x": "Borough",
         "address_x": "Address",
-        "new_units": "New Units",
-        "new_floors": "New Floors",
-        "new_building_height": "New Building Height"
+        "new units": "New Units",
+        "new floors": "New Floors",
+        "new building height": "New Building Height"
     })
 
     return gdf
