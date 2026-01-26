@@ -103,7 +103,7 @@ def load_data():
         "address_x": "Address",
         "new units": "New Units",
         "new floors": "New Floors",
-        "new building height": "New Building Height"
+        "new building height": "New Building Height",
         "resarea": "Residential Area",
         "commarea": "Commercial Area",
         "yearbuilt": "Year Built",
@@ -111,6 +111,7 @@ def load_data():
         "bldgclass": "Building Class",
         "ownername": "Owner"
     })
+
 
     return gdf
 
