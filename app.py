@@ -104,6 +104,12 @@ def load_data():
         "new units": "New Units",
         "new floors": "New Floors",
         "new building height": "New Building Height"
+        "resarea": "Residential Area",
+        "commarea": "Commercial Area",
+        "yearbuilt": "Year Built",
+        "zonedist1": "Zoning District 1",
+        "bldgclass": "Building Class",
+        "ownername": "Owner"
     })
 
     return gdf
@@ -277,7 +283,7 @@ with col_map:
             }
         },
 
-        map_style="mapbox://styles/mapbox/dark-v11",
+        map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
     )
     
     st.pydeck_chart(deck)
@@ -285,11 +291,46 @@ with col_map:
 # =============================
 # Right: Property List
 # =============================
+search_mode = st.selectbox(
+    "Search by",
+    ["Address", "ZIP Code", "Borough"]
+)
+
+search_query = st.text_input(
+    "Search",
+    placeholder="Type to search…"
+)
+
 with col_list:
     st.subheader("Property List")
     
     # Sort by New Units descending, get Top 10
-    list_df = gdf.sort_values("New Units", ascending=False).head(10)
+    filtered_gdf = gdf.copy()
+
+    if search_query:
+        q = search_query.lower()
+    
+        if search_mode == "Address":
+            filtered_gdf = filtered_gdf[
+                filtered_gdf["Address"].str.lower().str.contains(q, na=False)
+            ]
+    
+        elif search_mode == "ZIP Code":
+            filtered_gdf = filtered_gdf[
+                filtered_gdf["zipcode"].astype(str).str.contains(q, na=False)
+            ]
+    
+        elif search_mode == "Borough":
+            filtered_gdf = filtered_gdf[
+                filtered_gdf["Borough"].str.lower().str.contains(q, na=False)
+            ]
+    
+    list_df = (
+        filtered_gdf
+        .sort_values("New Units", ascending=False)
+        .head(10)
+    )
+
     
     st.caption(f"Top {len(list_df)} properties by New Units (Midtown Manhattan)")
     
@@ -368,9 +409,7 @@ with col_list:
                 res_area = format_number(safe_get(row, "Residential Area", 0))
                 comm_area = format_number(safe_get(row, "Commercial Area", 0))
 
-                air_rights = safe_get(row, "Air Rights", "N/A")
-                if air_rights != "N/A":
-                    air_rights = format_number(air_rights, "N/A")
+                air_rights = "Yes"
 
                 # ---- Zoning / Special (apply rules) ----
                 zoning = first_non_null(
