@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import geopandas as gpd
+from sqlalchemy import create_engine
+import os
 import numpy as np
 import pydeck as pdk
 import json
@@ -67,10 +69,47 @@ def first_non_null(row, cols, default="N/A"):
 # -----------------------------
 # Load data
 # -----------------------------
-@st.cache_data
+@st.cache_data(show_spinner=True)
 def load_data():
-    gdf = gpd.read_file("gdf_merged.geojson")
+    engine = create_engine(
+        "postgresql://nyc_rentstabilized_airrights_user:"
+        "Z08YucXA1MVD5kBghQcnlSoFQNCfwNv8"
+        "@dpg-d5ea8ap5pdvs73f8d3k0-a.virginia-postgres.render.com:5432"
+        "/nyc_rentstabilized_airrights"
+    )
+
+    query = """
+        SELECT
+            bbl_10,
+            borough,
+            address_x,
+            new_units,
+            new_floors,
+            new_building_height,
+            new_units_capped,
+            geom
+        FROM gdf_merged
+        WHERE geom IS NOT NULL
+    """
+
+    gdf = gpd.read_postgis(
+        query,
+        engine,
+        geom_col="geom"
+    )
+
+    # Key: map the columns on web dataset to the orignal columns
+    gdf = gdf.rename(columns={
+        "bbl_10": "BBL_10",
+        "borough": "Borough",
+        "address_x": "Address",
+        "new_units": "New Units",
+        "new_floors": "New Floors",
+        "new_building_height": "New Building Height"
+    })
+
     return gdf
+
 
 gdf = load_data()
 
