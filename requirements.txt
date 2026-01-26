@@ -1,0 +1,10 @@
+streamlit
+pandas
+numpy
+geopandas
+sqlalchemy
+psycopg2-binary
+pydeck
+shapely
+fiona
+pyproj
