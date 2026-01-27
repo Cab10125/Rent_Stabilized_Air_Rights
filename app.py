@@ -115,25 +115,25 @@ def load_data():
             borough_x,
             address_x,
             zipcode,
-        
+    
             -- core metrics
             "new units",
             "new floors",
             "new building height",
-        
+    
             -- areas
             resarea,
             comarea,
-        
+    
             -- attributes
             yearbuilt,
             zonedist1,
             bldgclass,
             ownername,
-        
+    
             new_units_capped,
-            geom
-
+    
+            -- more info fields
             lotarea,
             landuse,
             "community district",
@@ -143,14 +143,15 @@ def load_data():
             schooldist,
             firecomp,
             sanitdistrict,
-            taxmap
-
+            taxmap,
+    
+            -- geometry (ONLY ONCE)
             ST_AsEWKB(geom) AS geom
-            
+    
         FROM gdf_merged
         WHERE geom IS NOT NULL
-
     """
+
 
     gdf = gpd.read_postgis(
         query,
