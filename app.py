@@ -271,7 +271,10 @@ for col in fill_cols:
 # Color classification rules: 8 intervals
 def assign_bucket(units):
     """Assign New Units to corresponding bucket"""
-    units = float(units) if not pd.isna(units) else 0
+    try:
+        units = float(units)
+    except (TypeError, ValueError):
+        units = 0
     
     if units == 0:
         return "0"
@@ -344,7 +347,7 @@ col_map, col_list = st.columns([5, 5])
 with col_map:
     st.subheader("Interactive Map")
     
-    if st.button("🔄 Update Top 10 from map area"):
+    if st.button("Update Top 10 from map area"):
         st.session_state.use_map_filter = True
 
     # Prepare map data: ensure color is in properties, RGB array format (without transparency)
@@ -352,7 +355,7 @@ with col_map:
     
     gdf_map["colorRGB"] = gdf_map.apply(get_color_with_selection, axis=1)
 
-    
+
     # For tooltip to work correctly, add fields without spaces (pydeck tooltip limitation)
     # Also ensure values are properly formatted as numbers or strings
     if "New Units" in gdf_map.columns:
