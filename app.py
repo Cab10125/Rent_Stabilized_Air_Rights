@@ -70,6 +70,15 @@ def format_number(value, default=0):
     except (ValueError, TypeError):
         return default
 
+def fmt_int(x):
+    return "N/A" if x is None else f"{int(round(x)):,}"
+
+def fmt_area(x):
+    return "N/A" if x is None else f"{int(x):,} sq ft"
+
+def fmt_height(x):
+    return "N/A" if x is None else f"{int(x)} ft"
+
 def info_row(label, value):
     if value is None or (isinstance(value, float) and pd.isna(value)):
         value = "N/A"
@@ -583,16 +592,6 @@ with col_list:
                 
                 # =========================
                 # Part 1: Core summary information (BRIEF)
-                # =========================
-                # ===== formatting helpers=====
-                def fmt_int(x):
-                    return "N/A" if x is None else f"{int(round(x)):,}"
-                
-                def fmt_area(x):
-                    return "N/A" if x is None else f"{int(x):,} sq ft"
-                
-                def fmt_height(x):
-                    return "N/A" if x is None else f"{int(x)} ft"
 
                 # ===== Core Information =====
                 st.markdown("**Core Information**")
