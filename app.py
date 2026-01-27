@@ -146,7 +146,7 @@ def load_data():
             taxmap,
     
             -- geometry (ONLY ONCE)
-            ST_AsEWKB(geom) AS geom
+            ST_AsEWKB(ST_MakeValid(geom)) AS geom
     
         FROM gdf_merged
         WHERE geom IS NOT NULL
