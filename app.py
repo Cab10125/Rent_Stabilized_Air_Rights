@@ -146,7 +146,12 @@ def load_data():
             taxmap,
     
             -- geometry (ONLY ONCE)
-            ST_AsEWKB(ST_MakeValid(geom)) AS geom
+            ST_AsEWKB(
+                ST_CollectionExtract(
+                    ST_MakeValid(geom),
+                    3
+                )
+            ) AS geom
     
         FROM gdf_merged
         WHERE geom IS NOT NULL
@@ -158,6 +163,10 @@ def load_data():
         engine,
         geom_col="geom"
     )
+
+    # ---- HARD GUARD: drop bad geometries ----
+    gdf = gdf[gdf.geometry.notnull()]
+    gdf = gdf[gdf.geometry.is_valid]
 
     # Key: map the columns on web dataset to the orignal columns
     gdf = gdf.rename(columns={
@@ -418,8 +427,7 @@ with col_list:
     # =============================
     if search_query and len(list_df) > 0:
         try:
-            # 用搜索结果的整体中心
-            centroid = list_df.geometry.unary_union.centroid
+            centroid = list_df.geometry.centroid.iloc[0]
     
             st.session_state.map_center = {
                 "lat": centroid.y,
