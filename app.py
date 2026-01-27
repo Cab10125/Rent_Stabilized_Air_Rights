@@ -323,7 +323,7 @@ with col_map:
 
     if st.button("🔄 Update Top 10 from map area"):
         st.session_state.use_map_filter = True
-    
+
     # Prepare map data: ensure color is in properties, RGB array format (without transparency)
     gdf_map = gdf.copy()
     
