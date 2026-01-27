@@ -320,7 +320,7 @@ col_map, col_list = st.columns([5, 5])
 # =============================
 with col_map:
     st.subheader("Interactive Map")
-
+    
     if st.button("🔄 Update Top 10 from map area"):
         st.session_state.use_map_filter = True
 
