@@ -581,9 +581,9 @@ with col_list:
                     "Owner",
                 ]
                 
-            # =========================
-            # Part 1: Core summary information (BRIEF)
-            # =========================
+                # =========================
+                # Part 1: Core summary information (BRIEF)
+                # =========================
                 # ===== formatting helpers=====
                 def fmt_int(x):
                     return "N/A" if x is None else f"{int(round(x)):,}"
@@ -594,7 +594,7 @@ with col_list:
                 def fmt_height(x):
                     return "N/A" if x is None else f"{int(x)} ft"
 
-            # ===== Core Information =====
+                # ===== Core Information =====
                 st.markdown("**Core Information**")
 
                 # ---- Core values ----
