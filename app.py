@@ -545,29 +545,60 @@ with col_list:
                     subtitle = "New York, NY"
             else:
                 subtitle = f"New York, NY {zip_code}"
+
+            # Layout: property title (left) + locate button (right)
+            row_cols = st.columns([4, 1])
+            
+            with row_cols[0]:
+                st.markdown(f"**{title}**  \n{subtitle}")
+            
+            with row_cols[1]:
+                locate = st.button(
+                    "📍 Locate on Map",
+                    key=f"locate_{bbl}"
+                )
+            
+            # Handle map focus when locate button is clicked
+            if locate:
+                # Mark this property as selected
+                st.session_state.selected_bbl = bbl
+            
+                # Update map center using geometry
+                geom_geojson = row.get("geom_geojson")
+                if geom_geojson:
+                    center = get_geojson_center(geom_geojson)
+                    if center:
+                        st.session_state.map_center = {
+                            "lat": center[0],
+                            "lon": center[1],
+                            "zoom": 16
+                        }
+            
+                # Force rerun so the map updates immediately
+                st.experimental_rerun()
+
             
             # Expandable card
             with st.expander(f"**{title}**\n\n{subtitle}"):
 
-                # ---- map focus when this property is opened ----
-                # record the building selected by the user
-                st.session_state.selected_bbl = row["BBL_10"]
+                # # ---- map focus when this property is opened ----
+                # # record the building selected by the user
+                # st.session_state.selected_bbl = row["BBL_10"]
 
-                # update the center of the map (for zoom in)
-                geom_geojson = row.get("geom_geojson")
+                # # update the center of the map (for zoom in)
+                # geom_geojson = row.get("geom_geojson")
 
-                if geom_geojson:
-                    try:
-                        center = get_geojson_center(geom_geojson)
-                        if center:
-                            st.session_state.map_center = {
-                                "lat": center[0],
-                                "lon": center[1],
-                                "zoom": 16
-                            }
-                    except Exception:
-                        pass
-
+                # if geom_geojson:
+                #     try:
+                #         center = get_geojson_center(geom_geojson)
+                #         if center:
+                #             st.session_state.map_center = {
+                #                 "lat": center[0],
+                #                 "lon": center[1],
+                #                 "zoom": 16
+                #             }
+                #     except Exception:
+                #         pass
 
                 # ==== Display Config ====
                 LABEL_MAP = {
