@@ -18,12 +18,18 @@ st.set_page_config(
 if "detail_mode" not in st.session_state:
     st.session_state.detail_mode = False
 
+if "selected_bbl" not in st.session_state:
+    st.session_state.selected_bbl = None
+
 if "map_center" not in st.session_state:
     st.session_state.map_center = {
         "lat": 40.7549,
         "lon": -73.9840,
-        "zoom": 13
+        "zoom": 12
     }
+
+if "use_map_filter" not in st.session_state:
+    st.session_state.use_map_filter = False
     
 st.title("NYC Air Rights Explorer")
 # =============================
@@ -307,22 +313,16 @@ view_state = pdk.ViewState(
 # =============================
 # Main Layout
 # =============================
-ratio = st.slider(
-    "Layout balance (Map ↔ Info)",
-    min_value=2,
-    max_value=8,
-    value=6,
-    step=1
-)
-
-col_map, col_list = st.columns([ratio, 10 - ratio])
-
+col_map, col_list = st.columns([5, 5])
 
 # =============================
 # Left: Interactive Map
 # =============================
 with col_map:
     st.subheader("Interactive Map")
+
+    if st.button("🔄 Update Top 10 from map area"):
+    st.session_state.use_map_filter = True
     
     # Prepare map data: ensure color is in properties, RGB array format (without transparency)
     gdf_map = gdf.copy()
@@ -343,7 +343,16 @@ with col_map:
         }
         return color_map.get(bucket, [200, 200, 200])
     
-    gdf_map["colorRGB"] = gdf_map["units_bucket"].apply(get_color_rgb)
+    def get_color_with_selection(row):
+        # Selected building → Green
+        if st.session_state.selected_bbl == row["BBL_10"]:
+            return [0, 200, 0]
+    
+        # Other buildings → Colored according to New Units
+        return get_color_rgb(row["units_bucket"])
+    
+    gdf_map["colorRGB"] = gdf_map.apply(get_color_with_selection, axis=1)
+
     
     # For tooltip to work correctly, add fields without spaces (pydeck tooltip limitation)
     # Also ensure values are properly formatted as numbers or strings
@@ -440,6 +449,16 @@ with col_list:
     # Sort by New Units descending, get Top 10
     filtered_gdf = gdf.copy()
 
+    if st.session_state.use_map_filter:
+        lat = st.session_state.map_center["lat"]
+        lon = st.session_state.map_center["lon"]
+    
+        # A simple bbox, current window
+        filtered_gdf = filtered_gdf[
+            (filtered_gdf["latitude"].between(lat - 0.02, lat + 0.02)) &
+            (filtered_gdf["longitude"].between(lon - 0.02, lon + 0.02))
+        ]
+
     if search_query:
         q = search_query.lower()
     
@@ -520,8 +539,12 @@ with col_list:
             with st.expander(f"**{title}**\n\n{subtitle}"):
 
                 # ---- map focus when this property is opened ----
+                # record the building selected by the user
+                st.session_state.selected_bbl = row["BBL_10"]
+
+                # update the center of the map (for zoom in)
                 geom_geojson = row.get("geom_geojson")
-                
+
                 if geom_geojson:
                     try:
                         center = get_geojson_center(geom_geojson)
@@ -533,6 +556,7 @@ with col_list:
                             }
                     except Exception:
                         pass
+
 
                 # ==== Display Config ====
                 LABEL_MAP = {
