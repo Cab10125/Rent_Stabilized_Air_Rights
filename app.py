@@ -575,7 +575,7 @@ with col_list:
                         }
             
                 # Force rerun so the map updates immediately
-                st.experimental_rerun()
+                st.rerun()
 
             
             # Expandable card
