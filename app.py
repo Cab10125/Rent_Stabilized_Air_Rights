@@ -26,6 +26,18 @@ if "map_center" not in st.session_state:
     }
     
 st.title("NYC Air Rights Explorer")
+# =============================
+# Global Search (TOP)
+# =============================
+search_mode = st.selectbox(
+    "Search by",
+    ["Address", "ZIP Code", "Borough"]
+)
+
+search_query = st.text_input(
+    "Search",
+    placeholder="Type to search…"
+)
 
 # -----------------------------
 # Helper functions
@@ -188,6 +200,30 @@ def load_data():
 
 gdf = load_data()
 
+# Calculate bbx from GeoJSON (To zoom in map center)
+def get_geojson_center(geom_geojson):
+    """
+    geom_geojson: GeoJSON dict
+    return (lat, lon)
+    """
+    try:
+        coords = geom_geojson["coordinates"]
+
+        # Polygon / MultiPolygon
+        if geom_geojson["type"] == "Polygon":
+            flat = [pt for ring in coords for pt in ring]
+        elif geom_geojson["type"] == "MultiPolygon":
+            flat = [pt for poly in coords for ring in poly for pt in ring]
+        else:
+            return None
+
+        lons = [p[0] for p in flat]
+        lats = [p[1] for p in flat]
+
+        return sum(lats) / len(lats), sum(lons) / len(lons)
+    except Exception:
+        return None
+
 # -----------------------------
 # Data preparation
 # -----------------------------
@@ -320,7 +356,7 @@ with col_map:
         gdf_map["NewBuildingHeight"] = pd.to_numeric(gdf_map["New Building Height"], errors="coerce").fillna(0)
 
     gdf_map["AddressName"] = gdf_map["Address"].fillna("N/A")
-    gdf_map["ZipCode"] = gdf_map["zipcode"].astype(str).fillna("N/A")
+    gdf_map["ZipCode"] = gdf_map["zipcode"].astype(str).str.zfill(5).fillna("N/A")
     gdf_map["BoroughName"] = gdf_map["Borough"].fillna("N/A")
 
     
@@ -374,7 +410,7 @@ with col_map:
         tooltip={
             "html": """
             <b>{AddressName}</b><br/>
-            {BoroughName}, NY zipcode}<br/>
+            {BoroughName}, NY {zipcode}<br/>
             <hr/>
             <b>BBL:</b> {BBL_10}<br/>
             <b>New Units:</b> {NewUnits}<br/>
@@ -397,15 +433,7 @@ with col_map:
 # =============================
 # Right: Property List
 # =============================
-search_mode = st.selectbox(
-    "Search by",
-    ["Address", "ZIP Code", "Borough"]
-)
 
-search_query = st.text_input(
-    "Search",
-    placeholder="Type to search…"
-)
 
 with col_list:
     st.subheader("Property List")
@@ -492,19 +520,20 @@ with col_list:
             # Expandable card
             with st.expander(f"**{title}**\n\n{subtitle}"):
 
-                # # ---- map focus when this property is opened ----
-                # geom = row.get("geom")
+                # ---- map focus when this property is opened ----
+                geom = row.get("geom_geojson")
                 
-                # if geom is not None:
-                #     try:
-                #         centroid = geom.centroid
-                #         st.session_state.map_center = {
-                #             "lat": centroid.y,
-                #             "lon": centroid.x,
-                #             "zoom": 16
-                #         }
-                #     except Exception:
-                #         pass
+                if geom_json:
+                    try:
+                        center = get_geojson_center(geom_json)
+                        if center:
+                            st.session_state.map_center = {
+                                "lat": center[0],
+                                "lon": center[1],
+                                "zoom": 16
+                            }
+                    except Exception:
+                        pass
 
                 # ==== Display Config ====
                 LABEL_MAP = {
