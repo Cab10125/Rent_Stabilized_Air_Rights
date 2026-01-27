@@ -146,30 +146,27 @@ def load_data():
             taxmap,
     
             -- geometry (ONLY ONCE)
-            ST_AsEWKB(
-                ST_CollectionExtract(
-                    ST_MakeValid(geom),
-                    3
-                )
-            ) AS geom
+            ST_AsGeoJSON(
+              ST_Transform(
+                ST_CollectionExtract(ST_MakeValid(geom), 3),
+                4326
+              )
+            ) AS geom_geojson
+
     
         FROM gdf_merged
         WHERE geom IS NOT NULL
+          AND NOT ST_IsEmpty(geom)
+          AND ST_IsValid(geom)
+
     """
 
 
-    gdf = gpd.read_postgis(
-        query,
-        engine,
-        geom_col="geom"
-    )
+    df = pd.read_sql(query, engine)
 
-    # ---- HARD GUARD: drop bad geometries ----
-    gdf = gdf[gdf.geometry.notnull()]
-    gdf = gdf[gdf.geometry.is_valid]
 
     # Key: map the columns on web dataset to the orignal columns
-    gdf = gdf.rename(columns={
+    df = df.rename(columns={
         "bbl_10": "BBL_10",
         "borough_x": "Borough",
         "address_x": "Address",
@@ -186,7 +183,7 @@ def load_data():
         "ownername": "Owner"
     })
 
-    return gdf
+    return df
 
 
 gdf = load_data()
@@ -333,8 +330,26 @@ with col_map:
     
     # Convert to GeoJSON format
     # Use to_json() to ensure all properties are properly serialized
-    geo_json_str = gdf_map.to_json()
-    geo_data = json.loads(geo_json_str)
+    features = []
+    for _, r in gdf_map.iterrows():
+        gj = r.get("geom_geojson")
+        if not gj or pd.isna(gj):
+            continue
+    
+        try:
+            geom_obj = json.loads(gj)
+        except Exception:
+            continue
+    
+        props = r.drop(labels=["geom_geojson"]).to_dict()
+        features.append({
+            "type": "Feature",
+            "geometry": geom_obj,
+            "properties": props
+        })
+    
+    geo_data = {"type": "FeatureCollection", "features": features}
+
     
     # Map layer
     # pydeck GeoJsonLayer uses "properties.fieldName" to access fields in properties
@@ -359,7 +374,7 @@ with col_map:
         tooltip={
             "html": """
             <b>{AddressName}</b><br/>
-            {BoroughName}, NY {ZipCode}<br/>
+            {BoroughName}, NY zipcode}<br/>
             <hr/>
             <b>BBL:</b> {BBL_10}<br/>
             <b>New Units:</b> {NewUnits}<br/>
@@ -423,19 +438,19 @@ with col_list:
     )
 
     # =============================
-    # Search → Map interaction
-    # =============================
-    if search_query and len(list_df) > 0:
-        try:
-            centroid = list_df.geometry.centroid.iloc[0]
+    # # Search → Map interaction
+    # # =============================
+    # if search_query and len(list_df) > 0:
+    #     try:
+    #         centroid = list_df.geometry.centroid.iloc[0]
     
-            st.session_state.map_center = {
-                "lat": centroid.y,
-                "lon": centroid.x,
-                "zoom": 14 if len(list_df) > 1 else 16
-            }
-        except Exception:
-            pass
+    #         st.session_state.map_center = {
+    #             "lat": centroid.y,
+    #             "lon": centroid.x,
+    #             "zoom": 14 if len(list_df) > 1 else 16
+    #         }
+    #     except Exception:
+    #         pass
 
     
     st.caption(f"Top {len(list_df)} properties by New Units (Midtown Manhattan)")
@@ -477,19 +492,19 @@ with col_list:
             # Expandable card
             with st.expander(f"**{title}**\n\n{subtitle}"):
 
-                # ---- map focus when this property is opened ----
-                geom = row.get("geom")
+                # # ---- map focus when this property is opened ----
+                # geom = row.get("geom")
                 
-                if geom is not None:
-                    try:
-                        centroid = geom.centroid
-                        st.session_state.map_center = {
-                            "lat": centroid.y,
-                            "lon": centroid.x,
-                            "zoom": 16
-                        }
-                    except Exception:
-                        pass
+                # if geom is not None:
+                #     try:
+                #         centroid = geom.centroid
+                #         st.session_state.map_center = {
+                #             "lat": centroid.y,
+                #             "lon": centroid.x,
+                #             "zoom": 16
+                #         }
+                #     except Exception:
+                #         pass
 
                 # ==== Display Config ====
                 LABEL_MAP = {
