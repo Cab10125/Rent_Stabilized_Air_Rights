@@ -114,6 +114,7 @@ def load_data():
             bbl_10,
             borough_x,
             address_x,
+            zipcode,
         
             -- core metrics
             "new units",
@@ -520,41 +521,42 @@ with col_list:
 
                 with col1:
                     st.markdown("**New Units**")
-                    st.markdown(fmt_int(row["new units"]))
-            
+                    st.markdown(fmt_int(row["New Units"]))
+                
                     st.markdown("**New Floors**")
-                    st.markdown(fmt_int(row["new floors"])) 
-            
+                    st.markdown(fmt_int(row["New Floors"]))
+                
                     st.markdown("**New Building Height**")
-                    st.markdown(fmt_height(row["new building height"]))
-            
+                    st.markdown(fmt_height(row["New Building Height"]))
+                
                     st.markdown("**BBL**")
-                    st.markdown(row["bbl_10"])
-            
+                    st.markdown(row["BBL_10"])
+                
                     st.markdown("**Borough**")
-                    st.markdown(row["borough_x"])
+                    st.markdown(row["Borough"])
 
                 with col2:
                     st.markdown("**Residential Area**")
-                    st.markdown(fmt_area(row["resarea"]))
+                    st.markdown(fmt_area(row["Residential Area"]))
                 
                     st.markdown("**Commercial Area**")
-                    st.markdown(fmt_area(row["comarea"]))
+                    st.markdown(fmt_area(row["Commercial Area"]))
                 
                     st.markdown("**Air Rights**")
                     st.markdown("Yes")
                 
                     st.markdown("**Year Built**")
-                    st.markdown(fmt_int(row["yearbuilt"]))
+                    st.markdown(fmt_int(row["Year Built"]))
                 
                     st.markdown("**Zoning District**")
-                    st.markdown(row["zonedist1"] or "N/A")
+                    st.markdown(row["Zoning District 1"] or "N/A")
                 
                     st.markdown("**Building Class**")
-                    st.markdown(row["bldgclass"] or "N/A")
+                    st.markdown(row["Building Class"] or "N/A")
                 
                     st.markdown("**Owner**")
-                    st.markdown(row["ownername"] or "N/A")
+                    st.markdown(row["Owner"] or "N/A")
+
 
                 st.markdown("---")
 
