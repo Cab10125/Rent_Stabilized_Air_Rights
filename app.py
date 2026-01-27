@@ -116,7 +116,30 @@ def first_non_null(row, cols, default="N/A"):
                 return v
     return default
 
+# Add colorRGB field (RGB array, without transparency)
+# pydeck requires RGB array format [r, g, b]
+def get_color_rgb(bucket):
+    """Get RGB color array based on units_bucket"""
+    color_map = {
+        "0": [200, 200, 200],
+        "1–5": [255, 245, 204],
+        "5–20": [255, 225, 170],
+        "20–50": [255, 195, 120],
+        "50–100": [255, 160, 90],
+        "100–300": [240, 120, 70],
+        "300–500": [220, 80, 60],
+        "500+": [180, 40, 40],
+    }
+    return color_map.get(bucket, [200, 200, 200])
 
+def get_color_with_selection(row):
+    # Selected building → Green
+    if st.session_state.selected_bbl == row["BBL_10"]:
+        return [0, 200, 0]
+
+    # Other buildings → Colored according to New Units
+    return get_color_rgb(row["units_bucket"])
+    
 # -----------------------------
 # Load data
 # -----------------------------
@@ -326,30 +349,6 @@ with col_map:
 
     # Prepare map data: ensure color is in properties, RGB array format (without transparency)
     gdf_map = gdf.copy()
-    
-    # Add colorRGB field (RGB array, without transparency)
-    # pydeck requires RGB array format [r, g, b]
-    def get_color_rgb(bucket):
-        """Get RGB color array based on units_bucket"""
-        color_map = {
-            "0": [200, 200, 200],
-            "1–5": [255, 245, 204],
-            "5–20": [255, 225, 170],
-            "20–50": [255, 195, 120],
-            "50–100": [255, 160, 90],
-            "100–300": [240, 120, 70],
-            "300–500": [220, 80, 60],
-            "500+": [180, 40, 40],
-        }
-        return color_map.get(bucket, [200, 200, 200])
-    
-    def get_color_with_selection(row):
-        # Selected building → Green
-        if st.session_state.selected_bbl == row["BBL_10"]:
-            return [0, 200, 0]
-    
-        # Other buildings → Colored according to New Units
-        return get_color_rgb(row["units_bucket"])
     
     gdf_map["colorRGB"] = gdf_map.apply(get_color_with_selection, axis=1)
 
@@ -582,7 +581,7 @@ with col_list:
             # =========================
             # Part 1: Core summary information (BRIEF)
             # =========================
-                # ===== formatting helpers（放在这里）=====
+                # ===== formatting helpers=====
                 def fmt_int(x):
                     return "N/A" if x is None else f"{int(round(x)):,}"
                 
