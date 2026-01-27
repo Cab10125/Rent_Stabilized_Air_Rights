@@ -145,6 +145,8 @@ def load_data():
             sanitdistrict,
             taxmap
 
+            ST_AsEWKB(geom) AS geom
+            
         FROM gdf_merged
         WHERE geom IS NOT NULL
 
