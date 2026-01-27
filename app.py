@@ -133,6 +133,18 @@ def load_data():
         
             new_units_capped,
             geom
+
+            lotarea,
+            landuse,
+            "community district",
+            "city council district",
+            policeprct,
+            healthcenterdistrict,
+            schooldist,
+            firecomp,
+            sanitdistrict,
+            taxmap
+
         FROM gdf_merged
         WHERE geom IS NOT NULL
 
@@ -251,10 +263,16 @@ view_state = pdk.ViewState(
 # =============================
 # Main Layout
 # =============================
-if st.session_state.detail_mode:
-    col_map, col_list = st.columns([2, 8])
-else:
-    col_map, col_list = st.columns([6, 4])
+ratio = st.slider(
+    "Layout balance (Map ↔ Info)",
+    min_value=2,
+    max_value=8,
+    value=6,
+    step=1
+)
+
+col_map, col_list = st.columns([ratio, 10 - ratio])
+
 
 # =============================
 # Left: Interactive Map
@@ -291,6 +309,11 @@ with col_map:
         gdf_map["NewFloors"] = pd.to_numeric(gdf_map["New Floors"], errors="coerce").fillna(0)
     if "New Building Height" in gdf_map.columns:
         gdf_map["NewBuildingHeight"] = pd.to_numeric(gdf_map["New Building Height"], errors="coerce").fillna(0)
+
+    gdf_map["AddressName"] = gdf_map["Address"].fillna("N/A")
+    gdf_map["ZipCode"] = gdf_map["zipcode"].astype(str).fillna("N/A")
+    gdf_map["BoroughName"] = gdf_map["Borough"].fillna("N/A")
+
     
     # Ensure BBL_10 is not empty
     if "BBL_10" in gdf_map.columns:
@@ -323,6 +346,9 @@ with col_map:
         initial_view_state=view_state,
         tooltip={
             "html": """
+            <b>{AddressName}</b><br/>
+            {BoroughName}, NY {ZipCode}<br/>
+            <hr/>
             <b>BBL:</b> {BBL_10}<br/>
             <b>New Units:</b> {NewUnits}<br/>
             <b>New Floors:</b> {NewFloors}<br/>
@@ -489,7 +515,7 @@ with col_list:
                     return "N/A" if x is None else f"{int(x)} ft"
 
             # ===== Core Information =====
-                st.markdown("**Core Information")
+                st.markdown("**Core Information**")
 
                 # ---- Core values ----
                 new_units = format_number(safe_get(row, "New Units", 0))
@@ -520,43 +546,31 @@ with col_list:
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    st.markdown("**New Units**")
-                    st.markdown(fmt_int(row["New Units"]))
-                
-                    st.markdown("**New Floors**")
-                    st.markdown(fmt_int(row["New Floors"]))
-                
-                    st.markdown("**New Building Height**")
-                    st.markdown(fmt_height(row["New Building Height"]))
-                
-                    st.markdown("**BBL**")
-                    st.markdown(row["BBL_10"])
-                
-                    st.markdown("**Borough**")
-                    st.markdown(row["Borough"])
+                    info_row("New Units", fmt_int(row["New Units"]))
+                    info_row("New Floors", fmt_int(row["New Floors"]))
+                    info_row("New Building Height", fmt_height(row["New Building Height"]))
+                    info_row("BBL", row["BBL_10"])
+                    info_row("Borough", row["Borough"])
 
                 with col2:
-                    st.markdown("**Residential Area**")
-                    st.markdown(fmt_area(row["Residential Area"]))
-                
-                    st.markdown("**Commercial Area**")
-                    st.markdown(fmt_area(row["Commercial Area"]))
-                
-                    st.markdown("**Air Rights**")
-                    st.markdown("Yes")
-                
-                    st.markdown("**Year Built**")
-                    st.markdown(fmt_int(row["Year Built"]))
-                
-                    st.markdown("**Zoning District**")
-                    st.markdown(row["Zoning District 1"] or "N/A")
-                
-                    st.markdown("**Building Class**")
-                    st.markdown(row["Building Class"] or "N/A")
-                
-                    st.markdown("**Owner**")
-                    st.markdown(row["Owner"] or "N/A")
-
+                    info_row("Residential Area", fmt_area(row["Residential Area"]))
+                    info_row("Commercial Area", fmt_area(row["Commercial Area"]))
+                    info_row("Year Built", fmt_int(row["Year Built"]))
+                    info_row("Air Rights", "Yes")
+                    info_row(
+                        "Zoning District",
+                        safe_get(row, "Zoning District 1", "N/A")
+                    )
+                    
+                    info_row(
+                        "Building Class",
+                        safe_get(row, "Building Class", "N/A")
+                    )
+                    
+                    info_row(
+                        "Owner",
+                        safe_get(row, "Owner", "N/A")
+                    )
 
                 st.markdown("---")
 
@@ -581,6 +595,8 @@ with col_list:
                     "More (additional property details)",
                     key=f"more_{bbl}"
                 )
+
+                st.session_state.detail_mode = show_more
                 
                 if show_more:
                     st.session_state.detail_mode = True
