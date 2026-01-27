@@ -201,26 +201,25 @@ def load_data():
 gdf = load_data()
 
 # Calculate bbx from GeoJSON (To zoom in map center)
+import json
+
 def get_geojson_center(geom_geojson):
     """
-    geom_geojson: GeoJSON dict
-    return (lat, lon)
+    Return (lat, lon) center from GeoJSON string.
+    Supports Polygon and MultiPolygon.
     """
     try:
-        coords = geom_geojson["coordinates"]
+        geom = json.loads(geom_geojson)
 
-        # Polygon / MultiPolygon
-        if geom_geojson["type"] == "Polygon":
-            flat = [pt for ring in coords for pt in ring]
-        elif geom_geojson["type"] == "MultiPolygon":
-            flat = [pt for poly in coords for ring in poly for pt in ring]
-        else:
-            return None
+        if geom["type"] == "Polygon":
+            # the first coordinate of the exterior ring
+            lon, lat = geom["coordinates"][0][0]
+            return lat, lon
 
-        lons = [p[0] for p in flat]
-        lats = [p[1] for p in flat]
+        elif geom["type"] == "MultiPolygon":
+            lon, lat = geom["coordinates"][0][0][0]
+            return lat, lon
 
-        return sum(lats) / len(lats), sum(lons) / len(lons)
     except Exception:
         return None
 
@@ -521,11 +520,11 @@ with col_list:
             with st.expander(f"**{title}**\n\n{subtitle}"):
 
                 # ---- map focus when this property is opened ----
-                geom = row.get("geom_geojson")
+                geom_geojson = row.get("geom_geojson")
                 
-                if geom_json:
+                if geom_geojson:
                     try:
-                        center = get_geojson_center(geom_json)
+                        center = get_geojson_center(geom_geojson)
                         if center:
                             st.session_state.map_center = {
                                 "lat": center[0],
