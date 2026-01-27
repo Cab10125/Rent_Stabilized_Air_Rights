@@ -15,6 +15,16 @@ st.set_page_config(
     layout="wide"
 )
 
+if "detail_mode" not in st.session_state:
+    st.session_state.detail_mode = False
+
+if "map_center" not in st.session_state:
+    st.session_state.map_center = {
+        "lat": 40.7549,
+        "lon": -73.9840,
+        "zoom": 13
+    }
+    
 st.title("NYC Air Rights Explorer")
 
 # -----------------------------
@@ -230,17 +240,20 @@ for field, default in tooltip_fields.items():
 # -----------------------------
 # Default view: Manhattan Midtown
 # -----------------------------
-DEFAULT_VIEW = pdk.ViewState(
-    latitude=40.7549,
-    longitude=-73.9840,
-    zoom=14,
+view_state = pdk.ViewState(
+    latitude=st.session_state.map_center["lat"],
+    longitude=st.session_state.map_center["lon"],
+    zoom=st.session_state.map_center["zoom"],
     pitch=0
 )
 
-# -----------------------------
-# Main Layout: Two columns
-# -----------------------------
-col_map, col_list = st.columns([2.2, 1])
+# =============================
+# Main Layout
+# =============================
+if st.session_state.detail_mode:
+    col_map, col_list = st.columns([2, 8])
+else:
+    col_map, col_list = st.columns([6, 4])
 
 # =============================
 # Left: Interactive Map
@@ -306,7 +319,7 @@ with col_map:
     # Use bracket notation for field names with spaces
     deck = pdk.Deck(
         layers=[layer],
-        initial_view_state=DEFAULT_VIEW,
+        initial_view_state=view_state,
         tooltip={
             "html": """
             <b>BBL:</b> {BBL_10}<br/>
@@ -370,6 +383,22 @@ with col_list:
         .head(10)
     )
 
+    # =============================
+    # Search → Map interaction
+    # =============================
+    if search_query and len(list_df) > 0:
+        try:
+            # 用搜索结果的整体中心
+            centroid = list_df.geometry.unary_union.centroid
+    
+            st.session_state.map_center = {
+                "lat": centroid.y,
+                "lon": centroid.x,
+                "zoom": 14 if len(list_df) > 1 else 16
+            }
+        except Exception:
+            pass
+
     
     st.caption(f"Top {len(list_df)} properties by New Units (Midtown Manhattan)")
     
@@ -410,7 +439,21 @@ with col_list:
             # Expandable card
             with st.expander(f"**{title}**\n\n{subtitle}"):
 
-            # ==== Display Config ====
+                # ---- map focus when this property is opened ----
+                geom = row.get("geom")
+                
+                if geom is not None:
+                    try:
+                        centroid = geom.centroid
+                        st.session_state.map_center = {
+                            "lat": centroid.y,
+                            "lon": centroid.x,
+                            "zoom": 16
+                        }
+                    except Exception:
+                        pass
+
+                # ==== Display Config ====
                 LABEL_MAP = {
                     "Borough #": "Borough Number",
                     "Block #": "Block Number",
@@ -434,7 +477,18 @@ with col_list:
             # =========================
             # Part 1: Core summary information (BRIEF)
             # =========================
-                st.markdown("### Core Information")
+                # ===== formatting helpers（放在这里）=====
+                def fmt_int(x):
+                    return "N/A" if x is None else f"{int(round(x)):,}"
+                
+                def fmt_area(x):
+                    return "N/A" if x is None else f"{int(x):,} sq ft"
+                
+                def fmt_height(x):
+                    return "N/A" if x is None else f"{int(x)} ft"
+
+            # ===== Core Information =====
+                st.markdown("**Core Information")
 
                 # ---- Core values ----
                 new_units = format_number(safe_get(row, "New Units", 0))
@@ -465,59 +519,74 @@ with col_list:
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    info_row("New Units", new_units)
-                    info_row("New Floors", new_floors)
-                    info_row("New Building Height", new_height)
-                    info_row("Year Built", year_built)
+                    st.markdown("**New Units**")
+                    st.markdown(fmt_int(row["new units"]))
+            
+                    st.markdown("**New Floors**")
+                    st.markdown(fmt_int(row["new floors"])) 
+            
+                    st.markdown("**New Building Height**")
+                    st.markdown(fmt_height(row["new building height"]))
+            
+                    st.markdown("**BBL**")
+                    st.markdown(row["bbl_10"])
+            
+                    st.markdown("**Borough**")
+                    st.markdown(row["borough_x"])
 
                 with col2:
-                    info_row("Residential Area", res_area)
-                    info_row("Commercial Area", comm_area)
-                    info_row("Air Rights", air_rights)
-
-                info_row("Zoning District", zoning)
-                info_row("Special District", special_district)
-                info_row("Building Class", building_class)
-                info_row("Owner", owner)
+                    st.markdown("**Residential Area**")
+                    st.markdown(fmt_area(row["resarea"]))
+                
+                    st.markdown("**Commercial Area**")
+                    st.markdown(fmt_area(row["comarea"]))
+                
+                    st.markdown("**Air Rights**")
+                    st.markdown("Yes")
+                
+                    st.markdown("**Year Built**")
+                    st.markdown(fmt_int(row["yearbuilt"]))
+                
+                    st.markdown("**Zoning District**")
+                    st.markdown(row["zonedist1"] or "N/A")
+                
+                    st.markdown("**Building Class**")
+                    st.markdown(row["bldgclass"] or "N/A")
+                
+                    st.markdown("**Owner**")
+                    st.markdown(row["ownername"] or "N/A")
 
                 st.markdown("---")
 
                 # =========================
-                # Part 2: MORE – all remaining fields
+                # Part 2: MORE – meaningful fields only
                 # =========================
+                
+                MORE_INFO_FIELDS = {
+                    "lotarea": "Lot Area (sq ft)",
+                    "landuse": "Land Use",
+                    "community district": "Community District",
+                    "city council district": "City Council District",
+                    "policeprct": "Police Precinct",
+                    "healthcenterdistrict": "Health Center District",
+                    "schooldist": "School District",
+                    "firecomp": "Fire Company",
+                    "sanitdistrict": "Sanitation District",
+                    "taxmap": "Tax Map",
+                }
+                
                 show_more = st.checkbox(
-                    "More (all other columns)",
+                    "More (additional property details)",
                     key=f"more_{bbl}"
                 )
-
+                
                 if show_more:
-
-                    SKIP_COLS = {
-                        "geometry", "color", "colorRGB", "units_bucket",
-                        "Zoning District 1", "Zoning District 2", "Zoning District 3", "Zoning District 4",
-                        "Special District 1", "Special District 2",
-                        "New Units", "New Floors", "New Building Height",
-                        "Residential Area", "Commercial Area", "Air Rights",
-                        "Year Built", "Building Class", "Owner"
-                    }
-
-                    LABEL_MAP = {
-                        "Borough #": "Borough Number",
-                        "Block #": "Block Number",
-                        "Lot #": "Lot Number",
-                        "# of Floors": "Number of Floors",
-                    }
-
-                    for col in row.index:
-                        if col in SKIP_COLS:
+                    st.session_state.detail_mode = True
+                
+                    for col, label in MORE_INFO_FIELDS.items():
+                        val = row.get(col)
+                
+                        if pd.isna(val) or str(val).strip() == "":
                             continue
-
-                        value = row[col]
-                        if pd.isna(value) or str(value).strip() == "":
-                            continue
-
-                        if isinstance(value, (int, float)):
-                            value = format_number(value, "N/A")
-
-                        label = LABEL_MAP.get(col, col.replace("#", "Number"))
-                        info_row(label, value)
+                
+                        info_row(label, val)
