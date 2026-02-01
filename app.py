@@ -210,7 +210,7 @@ def load_data():
 
     # Key: map the columns on web dataset to the orignal columns
     df = df.rename(columns={
-        "bbl_10": "BBL",
+        "BBL_10": "BBL",
         "borough_x": "Borough",
         "address_x": "Address",
     
