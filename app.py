@@ -309,7 +309,7 @@ gdf["color"] = gdf["units_bucket"].apply(
 
 # Ensure all tooltip required fields exist and are not NaN
 tooltip_fields = {
-    "BBL_10": "N/A",
+    "BBL": "N/A",
     "New Units": 0,
     "New Floors": 0,
     "New Building Height": 0
@@ -361,13 +361,13 @@ with col_map:
         gdf_map["NewBuildingHeight"] = pd.to_numeric(gdf_map["New Building Height"], errors="coerce").fillna(0)
 
     gdf_map["AddressName"] = gdf_map["Address"].fillna("N/A")
-    gdf_map["ZipCode"] = gdf_map["zipcode"].astype(str).str.zfill(5).fillna("N/A")
+    gdf_map["Zipcode"] = gdf_map["Zipcode"].astype(str).str.zfill(5).fillna("N/A")
     gdf_map["BoroughName"] = gdf_map["Borough"].fillna("N/A")
 
     
-    # Ensure BBL_10 is not empty
-    if "BBL_10" in gdf_map.columns:
-        gdf_map["BBL_10"] = gdf_map["BBL_10"].astype(str).fillna("N/A")
+    # Ensure BBL is not empty
+    if "BBL" in gdf_map.columns:
+        gdf_map["BBL"] = gdf_map["BBL"].astype(str).fillna("N/A")
     
     # Convert to GeoJSON format
     # Use to_json() to ensure all properties are properly serialized
@@ -415,9 +415,9 @@ with col_map:
         tooltip={
             "html": """
             <b>{AddressName}</b><br/>
-            {BoroughName}, NY {zipcode}<br/>
+            {BoroughName}, NY {Zipcode}<br/>
             <hr/>
-            <b>BBL:</b> {BBL_10}<br/>
+            <b>BBL:</b> {BBL}<br/>
             <b>New Units:</b> {NewUnits}<br/>
             <b>New Floors:</b> {NewFloors}<br/>
             <b>New Building Height:</b> {NewBuildingHeight}
@@ -449,12 +449,6 @@ with col_list:
     if st.session_state.use_map_filter:
         lat = st.session_state.map_center["lat"]
         lon = st.session_state.map_center["lon"]
-    
-        # A simple bbox, current window
-        filtered_gdf = filtered_gdf[
-            (filtered_gdf["latitude"].between(lat - 0.02, lat + 0.02)) &
-            (filtered_gdf["longitude"].between(lon - 0.02, lon + 0.02))
-        ]
 
     if search_query:
         q = search_query.lower()
@@ -466,7 +460,7 @@ with col_list:
     
         elif search_mode == "ZIP Code":
             filtered_gdf = filtered_gdf[
-                filtered_gdf["zipcode"].astype(str).str.contains(q, na=False)
+                filtered_gdf["Zipcode"].astype(str).str.contains(q, na=False)
             ]
     
         elif search_mode == "Borough":
@@ -503,7 +497,7 @@ with col_list:
     else:
         for idx, row in list_df.iterrows():
             # Collapsed state: title and subtitle
-            bbl = safe_get(row, "BBL_10", "N/A")
+            bbl = safe_get(row, "BBL", "N/A")
             
             # Try to get address
             address_fields = ["Address", "Street Name", "House Number", "Street"]
@@ -569,7 +563,7 @@ with col_list:
 
                 # # ---- map focus when this property is opened ----
                 # # record the building selected by the user
-                # st.session_state.selected_bbl = row["BBL_10"]
+                # st.session_state.selected_bbl = row["BBL"]
 
                 # # update the center of the map (for zoom in)
                 # geom_geojson = row.get("geom_geojson")
@@ -599,7 +593,7 @@ with col_list:
                     "New Floors",
                     "New Building Height",
                     "Air Rights",
-                    "BBL_10",
+                    "BBL",
                     "Borough",
                     "Address",
                     "Zoning District 1",
@@ -645,7 +639,7 @@ with col_list:
                     info_row("New Units", fmt_int(row["New Units"]))
                     info_row("New Floors", fmt_int(row["New Floors"]))
                     info_row("New Building Height", fmt_height(row["New Building Height"]))
-                    info_row("BBL", row["BBL_10"])
+                    info_row("BBL", row["BBL"])
                     info_row("Borough", row["Borough"])
 
                 with col2:
