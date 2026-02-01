@@ -168,7 +168,7 @@ def load_data():
     
             -- core metrics
             "new units",
-            "% of New Units Impact",
+            "%% of New Units Impact",
             "new floors",
             "new building height",
             "Air Rights",
