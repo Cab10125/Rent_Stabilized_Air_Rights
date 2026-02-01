@@ -29,7 +29,7 @@ if "view_mode" not in st.session_state:
     st.session_state.view_mode = "top10"
 
 if "near_center" not in st.session_state:
-    # used when user wants "Top 10 near this property"
+    # used for "Top 10 near this property"
     st.session_state.near_center = None
 
 # =============================
@@ -37,7 +37,6 @@ if "near_center" not in st.session_state:
 # =============================
 search_mode = st.selectbox("Search by", ["Address", "ZIP Code", "Borough"])
 st.caption("Tip: Use borough abbreviations. MN: Manhattan, BX: Bronx, BK: Brooklyn, QN: Queen")
-
 search_query = st.text_input("Search", placeholder="Type to search…")
 
 # -----------------------------
@@ -99,7 +98,7 @@ def fmt_percent_from_ratio(ratio):
 
 def get_geojson_center(geom_geojson):
     """
-    Return (lat, lon) center-ish from GeoJSON string.
+    Return (lat, lon) focus point from GeoJSON string.
     Supports Polygon and MultiPolygon.
     Uses first coordinate as a stable proxy for focus.
     """
@@ -117,11 +116,11 @@ def get_geojson_center(geom_geojson):
 def impact_to_color(impact_ratio):
     """
     Color buckets:
-      1% - 30%   -> green
-      30% - 60%  -> yellow
-      60% - 100% -> orange
+      1% - 30%    -> green
+      30% - 60%   -> yellow
+      60% - 100%  -> orange
       100% - 150% -> light red
-      150%+      -> deep red
+      150%+       -> deep red
     impact_ratio is stored as 0.92 for 92%.
     """
     try:
@@ -151,7 +150,6 @@ def get_color_with_selection(row):
 def info_row(label, value):
     if value is None or (isinstance(value, float) and pd.isna(value)):
         value = "N/A"
-
     st.markdown(
         f"""
         <div style="margin: 6px 0 14px 0;">
@@ -168,9 +166,8 @@ def info_row(label, value):
 
 def render_detail_two_columns(row):
     """
-    Render all details in two columns (not two properties per row).
+    Render all details in two columns.
     """
-    # Ordered fields (you can adjust this list later without changing layout code)
     fields = [
         ("Address", safe_get(row, "Address")),
         ("Borough", safe_get(row, "Borough")),
@@ -199,6 +196,51 @@ def render_detail_two_columns(row):
     for i, (label, value) in enumerate(fields):
         with (col1 if i % 2 == 0 else col2):
             info_row(label, value)
+
+def select_property(row):
+    """
+    Single source of truth for selecting a property.
+    Both map click and Locate button call this.
+    """
+    bbl = str(safe_get(row, "BBL", None))
+    if not bbl or bbl == "None" or bbl == "N/A":
+        return
+
+    st.session_state.selected_bbl = bbl
+    st.session_state.view_mode = "single"
+
+    center = get_geojson_center(row.get("geom_geojson"))
+    if center:
+        st.session_state.map_center = {"lat": center[0], "lon": center[1], "zoom": 16}
+
+def extract_clicked_bbl(selection):
+    """
+    Streamlit selection schema can vary by version.
+    This function tries multiple patterns to locate clicked feature properties.
+    """
+    if not selection or not isinstance(selection, dict):
+        return None
+
+    objs = selection.get("objects")
+    if objs is None:
+        return None
+
+    # Case A: objects is a list
+    if isinstance(objs, list) and len(objs) > 0:
+        obj0 = objs[0]
+        props = obj0.get("properties", obj0)
+        return props.get("BBL")
+
+    # Case B: objects is a dict keyed by layer id
+    if isinstance(objs, dict):
+        for _, v in objs.items():
+            if isinstance(v, list) and len(v) > 0:
+                obj0 = v[0]
+                props = obj0.get("properties", obj0)
+                if "BBL" in props:
+                    return props.get("BBL")
+
+    return None
 
 # -----------------------------
 # Load data
@@ -290,8 +332,7 @@ try:
     top_idx = gdf["% of New Units Impact"].astype(float).idxmax()
     top_row = gdf.loc[top_idx]
     top_center = get_geojson_center(top_row.get("geom_geojson"))
-    if top_center and "map_center" in st.session_state:
-        # only set once per session unless user changes it
+    if top_center:
         if st.session_state.map_center == {"lat": 40.7549, "lon": -73.9840, "zoom": 12}:
             st.session_state.map_center = {"lat": top_center[0], "lon": top_center[1], "zoom": 15}
 except Exception:
@@ -313,7 +354,6 @@ with col_map:
         st.session_state.view_mode = "top10"
         st.session_state.near_center = None
 
-    # Build map dataset for pydeck
     gdf_map = gdf.copy()
     gdf_map["BBL"] = gdf_map["BBL"].astype(str)
 
@@ -326,7 +366,6 @@ with col_map:
     gdf_map["NewFloorsNum"] = pd.to_numeric(gdf_map["New Floors"], errors="coerce").fillna(0)
     gdf_map["NewHeightNum"] = pd.to_numeric(gdf_map["New Building Height"], errors="coerce").fillna(0)
 
-    # Selection-aware fill color
     gdf_map["fillColor"] = gdf_map.apply(get_color_with_selection, axis=1)
 
     features = []
@@ -334,12 +373,10 @@ with col_map:
         gj = r.get("geom_geojson")
         if not gj or pd.isna(gj):
             continue
-
         try:
             geom_obj = json.loads(gj)
         except Exception:
             continue
-
         props = r.drop(labels=["geom_geojson"]).to_dict()
         features.append({"type": "Feature", "geometry": geom_obj, "properties": props})
 
@@ -355,6 +392,7 @@ with col_map:
     layer = pdk.Layer(
         "GeoJsonLayer",
         data=geo_data,
+        id="buildings",
         pickable=True,
         stroked=True,
         filled=True,
@@ -383,23 +421,24 @@ with col_map:
         map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
     )
 
-    # Click selection (version-safe)
-    chart = st.pydeck_chart(deck, use_container_width=True, on_select="rerun")
+    # Enable selection for map click (version dependent)
+    chart = st.pydeck_chart(
+        deck,
+        use_container_width=True,
+        on_select="rerun",
+        selection_mode="single-object",
+    )
 
-    # If Streamlit provides selection, use it to switch to single-property mode
+    # Make map click behave exactly like Locate
     try:
         sel = getattr(chart, "selection", None)
-        if sel and isinstance(sel, dict):
-            objs = sel.get("objects") or []
-            if len(objs) > 0:
-                obj0 = objs[0]
-                props = obj0.get("properties", obj0)
-                clicked_bbl = props.get("BBL")
-                if clicked_bbl is not None:
-                    st.session_state.selected_bbl = str(clicked_bbl)
-                    st.session_state.view_mode = "single"
+        clicked_bbl = extract_clicked_bbl(sel)
+        if clicked_bbl is not None:
+            clicked_bbl = str(clicked_bbl)
+            match = gdf[gdf["BBL"].astype(str) == clicked_bbl]
+            if len(match) > 0:
+                select_property(match.iloc[0])
     except Exception:
-        # If selection is unavailable in this Streamlit version, do nothing
         pass
 
 # =============================
@@ -408,7 +447,6 @@ with col_map:
 with col_list:
     st.subheader("Property List")
 
-    # If user clicked on map and we are in single view
     if st.session_state.view_mode == "single" and st.session_state.selected_bbl is not None:
         sel_bbl = str(st.session_state.selected_bbl)
         match = gdf[gdf["BBL"].astype(str) == sel_bbl]
@@ -422,7 +460,6 @@ with col_list:
             st.markdown(f"### {title}")
             st.caption(f"New York, NY {zipcode}")
 
-            # Action buttons
             b1, b2 = st.columns([1, 1])
             with b1:
                 if st.button("Show Top 10 near this property"):
@@ -433,6 +470,7 @@ with col_list:
                         st.session_state.use_map_filter = True
                     st.session_state.view_mode = "top10"
                     st.rerun()
+
             with b2:
                 if st.button("Back to global Top 10"):
                     st.session_state.view_mode = "top10"
@@ -442,11 +480,9 @@ with col_list:
                     st.rerun()
 
             st.markdown("---")
-            # Two-column detail layout
             render_detail_two_columns(row)
 
     else:
-        # TOP 10 mode
         filtered = gdf.copy()
 
         # Search filtering
@@ -457,17 +493,15 @@ with col_list:
                 filtered = filtered[filtered["Address"].fillna("").str.lower().str.contains(q, na=False)]
 
             elif search_mode == "ZIP Code":
-                # Multi-zip support: split by comma/space
                 tokens = [t for t in q.replace(",", " ").split() if t]
                 if len(tokens) > 0:
                     z = filtered["Zipcode"].astype(str).str.zfill(5)
                     filtered = filtered[z.isin([t.zfill(5) for t in tokens])]
 
             elif search_mode == "Borough":
-                # Expect abbreviations like MN, BX, BK, QN
                 filtered = filtered[filtered["Borough"].fillna("").str.lower().str.contains(q, na=False)]
 
-        # Optional "near center" filter (for the button "Top 10 near this property")
+        # Optional "near center" filter
         if st.session_state.use_map_filter and st.session_state.near_center is not None:
             lat0, lon0 = st.session_state.near_center
             if "Latitude" in filtered.columns and "Longitude" in filtered.columns:
@@ -476,13 +510,11 @@ with col_list:
                     & filtered["Longitude"].between(lon0 - 0.02, lon0 + 0.02)
                 ]
 
-        # Sort by impact (desc) and take top 10
         filtered["% of New Units Impact"] = pd.to_numeric(filtered["% of New Units Impact"], errors="coerce").fillna(0)
         top10 = filtered.sort_values("% of New Units Impact", ascending=False).head(10)
 
         st.caption(f"Top {len(top10)} properties by % Impact")
 
-        # Two columns for compact list layout (still one property per card)
         left_col, right_col = st.columns(2)
 
         for i, (_, r) in enumerate(top10.iterrows()):
@@ -494,17 +526,15 @@ with col_list:
             impact = fmt_percent_from_ratio(safe_get(r, "% of New Units Impact", None))
 
             with container:
-                header_cols = st.columns([4, 1])
+                header_cols = st.columns([8, 1])
                 with header_cols[0]:
                     st.markdown(f"**{addr}**  \nNew York, NY {zc}  \n% Impact: {impact}")
                 with header_cols[1]:
-                    if st.button("Locate", key=f"locate_{bbl}"):
-                        st.session_state.selected_bbl = bbl
-                        st.session_state.view_mode = "single"
-                        center = get_geojson_center(r.get("geom_geojson"))
-                        if center:
-                            st.session_state.map_center = {"lat": center[0], "lon": center[1], "zoom": 16}
+                    # Icon-only button to avoid vertical text layout
+                    if st.button("📍", key=f"locate_{bbl}", help="Locate on map"):
+                        select_property(r)
                         st.rerun()
 
-                with st.expander(f"{addr} | New York, NY {zc}"):
+                # Expander label should not repeat the address
+                with st.expander("Details"):
                     render_detail_two_columns(r)
