@@ -168,12 +168,17 @@ def load_data():
     
             -- core metrics
             "new units",
+            "% of New Units Impact",
             "new floors",
             "new building height",
+            "Air Rights",
     
             -- areas
             resarea,
             comarea,
+            "Units Residential",
+            "Units Commercial",
+            "Units Total",
     
             -- attributes
             yearbuilt,
@@ -182,18 +187,6 @@ def load_data():
             ownername,
     
             new_units_capped,
-    
-            -- more info fields
-            lotarea,
-            landuse,
-            "community district",
-            "city council district",
-            policeprct,
-            healthcenterdistrict,
-            schooldist,
-            firecomp,
-            sanitdistrict,
-            taxmap,
     
             -- geometry (ONLY ONCE)
             ST_AsGeoJSON(
@@ -217,7 +210,7 @@ def load_data():
 
     # Key: map the columns on web dataset to the orignal columns
     df = df.rename(columns={
-        "bbl_10": "BBL_10",
+        "bbl_10": "BBL",
         "borough_x": "Borough",
         "address_x": "Address",
     
