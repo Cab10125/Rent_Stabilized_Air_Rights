@@ -459,4 +459,20 @@ with col_list:
 
                 # Two-column layout for readability
                 left, right = st.columns(2)
-                half = int(np.ceil
+                half = int(np.ceil(len(fields_in_order) / 2))
+                left_fields = fields_in_order[:half]
+                right_fields = fields_in_order[half:]
+
+                with left:
+                    for label, key, formatter in left_fields:
+                        val = safe_get(row, key, "N/A")
+                        if formatter is not None:
+                            val = formatter(val)
+                        info_row(label, val)
+
+                with right:
+                    for label, key, formatter in right_fields:
+                        val = safe_get(row, key, "N/A")
+                        if formatter is not None:
+                            val = formatter(val)
+                        info_row(label, val)
