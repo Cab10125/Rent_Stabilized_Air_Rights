@@ -196,9 +196,9 @@ def load_data():
 
     
         FROM gdf_merged
-        WHERE geom IS NOT NULL
-          AND NOT ST_IsEmpty(geom)
-          AND ST_IsValid(geom)
+        WHERE geometry IS NOT NULL
+          AND NOT ST_IsEmpty(geometry)
+          AND ST_IsValid(geometry)
 
     """
 
