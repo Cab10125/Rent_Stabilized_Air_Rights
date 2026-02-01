@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 import os
 import numpy as np
 import pydeck as pdk
@@ -246,7 +246,9 @@ def load_data():
           AND ST_IsValid(geometry)
     """
 
-    df = pd.read_sql(query, engine)
+    # SQLAlchemy 2.x safe read
+    with engine.connect() as conn:
+        df = pd.read_sql_query(text(query), conn)
 
     # Standardize names used in the app
     df = df.rename(
