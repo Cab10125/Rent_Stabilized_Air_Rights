@@ -5,6 +5,7 @@ import os
 import numpy as np
 import pydeck as pdk
 import json
+from sqlalchemy import text
 
 # -----------------------------
 # Page config
@@ -181,10 +182,12 @@ def get_color_with_selection(row):
 # Load data
 # -----------------------------
 @st.cache_data(show_spinner=True)
+@st.cache_data(show_spinner=True)
 def load_data():
-    engine = create_engine(os.environ["DATABASE_URL"])
+    db_url = os.environ["DATABASE_URL"]  # 你现在就是用这个
 
-    # IMPORTANT: % column name is exactly: % of New Units Impact
+    engine = create_engine(db_url, pool_pre_ping=True)
+
     query = """
         SELECT
             "BBL_10",
@@ -222,9 +225,9 @@ def load_data():
           AND ST_IsValid(geometry)
     """
 
-    df = pd.read_sql(query, engine)
+    with engine.connect() as conn:
+        df = pd.read_sql_query(text(query), conn)
 
-    # rename to frontend-friendly column names
     df = df.rename(columns={
         "BBL_10": "BBL",
         "Borough_x": "Borough",
