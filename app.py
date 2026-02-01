@@ -189,7 +189,7 @@ def load_data():
             -- geometry (ONLY ONCE)
             ST_AsGeoJSON(
               ST_Transform(
-                ST_CollectionExtract(ST_MakeValid(geom), 3),
+                ST_CollectionExtract(ST_MakeValid(geometry), 3),
                 4326
               )
             ) AS geom_geojson
