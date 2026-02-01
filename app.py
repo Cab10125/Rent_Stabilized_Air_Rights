@@ -186,8 +186,6 @@ def load_data():
             "BldgClass",
             "OwnerName",
     
-            new_units_capped,
-    
             -- geometry (ONLY ONCE)
             ST_AsGeoJSON(
               ST_Transform(
