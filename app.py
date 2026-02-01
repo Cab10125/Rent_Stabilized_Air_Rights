@@ -161,7 +161,7 @@ def load_data():
 
     query = """
         SELECT
-            bbl_10,
+            BBL_10,
             borough_x,
             address_x,
             zipcode,
