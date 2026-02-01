@@ -161,30 +161,30 @@ def load_data():
 
     query = """
         SELECT
-            BBL_10,
-            borough_x,
-            address_x,
-            zipcode,
+            "BBL_10",
+            "Borough_x",
+            "Address_x",
+            "Zipcode",
     
             -- core metrics
-            "new units",
+            "New Units",
             "%% of New Units Impact",
-            "new floors",
-            "new building height",
+            "New Floors",
+            "New Building Height",
             "Air Rights",
     
             -- areas
-            resarea,
-            comarea,
+            "Residential Area",
+            "Commercial Area",
             "Units Residential",
             "Units Commercial",
             "Units Total",
     
             -- attributes
-            yearbuilt,
-            zonedist1,
-            bldgclass,
-            ownername,
+            "Year Built",
+            "ZoneDist1",
+            "BldgClass",
+            "OwnerName",
     
             new_units_capped,
     
@@ -211,19 +211,12 @@ def load_data():
     # Key: map the columns on web dataset to the orignal columns
     df = df.rename(columns={
         "BBL_10": "BBL",
-        "borough_x": "Borough",
-        "address_x": "Address",
+        "Borough_x": "Borough",
+        "Address_x": "Address",
     
-        "new units": "New Units",
-        "new floors": "New Floors",
-        "new building height": "New Building Height",
-    
-        "resarea": "Residential Area",
-        "comarea": "Commercial Area",
-        "yearbuilt": "Year Built",
-        "zonedist1": "Zoning District 1",
-        "bldgclass": "Building Class",
-        "ownername": "Owner"
+        "ZoneDist1": "Zoning District 1",
+        "BldgClass": "Building Class",
+        "OwnerName": "Owner"
     })
 
     return df
