@@ -143,7 +143,7 @@ def get_color_rgb(bucket):
 
 def get_color_with_selection(row):
     # Selected building → Green
-    if st.session_state.selected_bbl == row["BBL_10"]:
+    if st.session_state.selected_bbl == row["BBL"]:
         return [0, 200, 0]
 
     # Other buildings → Colored according to New Units
@@ -616,8 +616,6 @@ with col_list:
 
                 res_area = format_number(safe_get(row, "Residential Area", 0))
                 comm_area = format_number(safe_get(row, "Commercial Area", 0))
-
-                air_rights = "Yes"
 
                 # ---- Zoning / Special (apply rules) ----
                 zoning = first_non_null(
