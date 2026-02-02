@@ -459,72 +459,6 @@ with col_map:
 with col_list:
     st.subheader("Property List")
 
-    # CSS: locate icon as a perfectly centered pin, without text baseline drift
-    st.markdown(
-        """
-        <style>
-        .locate-wrap {
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-        }
-
-        .locate-wrap div[data-testid="stButton"] {
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-        }
-
-        .locate-wrap div[data-testid="stButton"] > button {
-            width: 34px !important;
-            height: 34px !important;
-            min-width: 34px !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            border-radius: 10px !important;
-
-            font-size: 0 !important;
-            line-height: 0 !important;
-
-            position: relative !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-        }
-
-        .locate-wrap div[data-testid="stButton"] > button::before {
-            content: "⚲";
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 18px;
-            line-height: 1;
-        }
-
-        .card-title {
-            font-weight: 800;
-            font-size: 20px;
-            line-height: 1.15;
-            color: #111827;
-        }
-
-        .card-sub {
-            font-size: 16px;
-            color: #111827;
-            margin-top: 2px;
-        }
-
-        .card-metric {
-            font-size: 18px;
-            color: #111827;
-            margin-top: 8px;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
     if st.session_state.view_mode == "single" and st.session_state.selected_bbl is not None:
         sel_bbl = str(st.session_state.selected_bbl)
         match = gdf[gdf["BBL"].astype(str) == sel_bbl]
@@ -605,7 +539,7 @@ with col_list:
             impact = fmt_percent_from_ratio(safe_get(r, "% of New Units Impact", None))
 
             with container:
-                header_cols = st.columns([12, 1])
+                header_cols = st.columns([14, 0.8])
                 with header_cols[0]:
                     # Use HTML for stable bold (prevents literal **stars** rendering)
                     st.markdown(f'<div class="card-title">{addr}</div>', unsafe_allow_html=True)
@@ -613,12 +547,10 @@ with col_list:
                     st.markdown(f'<div class="card-metric">% Impact: {impact}</div>', unsafe_allow_html=True)
 
                 with header_cols[1]:
-                    st.markdown('<div class="locate-wrap">', unsafe_allow_html=True)
-                    # IMPORTANT: keep label as a single space, icon is drawn by CSS ::before
-                    if st.button(" ", key=f"locate_{bbl}", help="Locate on map"):
+                    if st.button("📍", key=f"locate_{bbl}", help="Locate on map"):
                         select_property(r)
                         st.rerun()
-                    st.markdown("</div>", unsafe_allow_html=True)
+
 
                 with st.expander("Details"):
                     render_detail_two_columns(r)
