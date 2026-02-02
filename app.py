@@ -493,7 +493,7 @@ with col_list:
         }
 
         .locate-wrap div[data-testid="stButton"] > button::before {
-            content: "📍";
+            content: "⚲";
             position: absolute;
             left: 50%;
             top: 50%;
