@@ -469,18 +469,36 @@ with col_list:
             justify-content: flex-end;
             align-items: center;
         }
+    
+        /* Force the Streamlit button to be a compact square */
         .locate-wrap div[data-testid="stButton"] > button {
-            padding: 0 !important;
             width: 34px !important;
             height: 34px !important;
             min-width: 34px !important;
+    
+            padding: 0 !important;
+            margin: 0 !important;
+    
             border-radius: 8px !important;
-
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            line-height: 1 !important;
-            font-size: 18px !important;
+    
+            /* Hide the original label (a space) */
+            font-size: 0 !important;
+            line-height: 0 !important;
+    
+            /* Create a stable centering context */
+            position: relative !important;
+        }
+    
+        /* Draw the pin as a pseudo-element and center it perfectly */
+        .locate-wrap div[data-testid="stButton"] > button::before {
+            content: "📍";
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+    
+            font-size: 18px;
+            line-height: 1;
         }
         </style>
         """,
@@ -572,7 +590,7 @@ with col_list:
 
                 with header_cols[1]:
                     st.markdown('<div class="locate-wrap">', unsafe_allow_html=True)
-                    if st.button("📍", key=f"locate_{bbl}", help="Locate on map"):
+                    if st.button(" ", key=f"locate_{bbl}", help="Locate on map"):
                         select_property(r)
                         st.rerun()
                     st.markdown("</div>", unsafe_allow_html=True)
