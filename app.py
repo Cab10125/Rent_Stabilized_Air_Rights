@@ -189,9 +189,6 @@ def render_detail_two_columns(row):
         ("Year Built", fmt_int(safe_get(row, "Year Built", None))),
         ("Zoning District 1", safe_get(row, "Zoning District 1")),
         ("Building Class", safe_get(row, "Building Class")),
-
-        # Requested: keep these two at the bottom
-        ("Existing Number of Floors", fmt_int(safe_get(row, "Existing Number of Floors", None))),
         ("Owner", safe_get(row, "Owner")),
     ]
 
@@ -276,8 +273,6 @@ def load_data():
             "BldgClass" AS bldgclass,
             "OwnerName" AS ownername,
 
-            "# of Floors" AS existing_floors,
-
             "Latitude" AS latitude,
             "Longitude" AS longitude,
 
@@ -316,7 +311,6 @@ def load_data():
             "zonedist1": "Zoning District 1",
             "bldgclass": "Building Class",
             "ownername": "Owner",
-            "existing_floors": "Existing Number of Floors",
             "latitude": "Latitude",
             "longitude": "Longitude",
         }
@@ -329,7 +323,6 @@ gdf = load_data()
 # Ensure correct dtypes
 gdf["New Units"] = pd.to_numeric(gdf["New Units"], errors="coerce").fillna(0)
 gdf["% of New Units Impact"] = pd.to_numeric(gdf["% of New Units Impact"], errors="coerce").fillna(0)
-gdf["Existing Number of Floors"] = pd.to_numeric(gdf["Existing Number of Floors"], errors="coerce")
 
 # Precompute color by impact
 gdf["impactColor"] = gdf["% of New Units Impact"].apply(impact_to_color)
@@ -372,11 +365,6 @@ with col_map:
     gdf_map["NewUnitsNum"] = pd.to_numeric(gdf_map["New Units"], errors="coerce").fillna(0).astype(int)
     gdf_map["NewFloorsNum"] = pd.to_numeric(gdf_map["New Floors"], errors="coerce").fillna(0)
     gdf_map["NewHeightNum"] = pd.to_numeric(gdf_map["New Building Height"], errors="coerce").fillna(0)
-
-    gdf_map["ExistingFloorsNum"] = pd.to_numeric(
-        gdf_map["Existing Number of Floors"], errors="coerce"
-    ).fillna(np.nan)
-    gdf_map["OwnerNameStr"] = gdf_map["Owner"].fillna("N/A")
 
     gdf_map["fillColor"] = gdf_map.apply(get_color_with_selection, axis=1)
 
@@ -426,15 +414,14 @@ with col_map:
             <b>% Impact:</b> {ImpactPctStr}<br/>
             <b>New Units:</b> {NewUnitsNum}<br/>
             <b>New Floors:</b> {NewFloorsNum}<br/>
-            <b>New Building Height:</b> {NewHeightNum}<br/>
-            <b>Existing Number of Floors:</b> {ExistingFloorsNum}<br/>
-            <b>Owner:</b> {OwnerNameStr}
+            <b>New Building Height:</b> {NewHeightNum}
             """,
             "style": {"backgroundColor": "black", "color": "white", "fontSize": "12px", "padding": "8px"},
         },
         map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
     )
 
+    # Enable selection for map click (version dependent)
     chart = st.pydeck_chart(
         deck,
         use_container_width=True,
@@ -459,31 +446,6 @@ with col_map:
 # =============================
 with col_list:
     st.subheader("Property List")
-
-    # CSS: Style ONLY the locate buttons via the "help" tooltip (title attribute)
-    st.markdown(
-        """
-        <style>
-        /* Only target buttons with the tooltip title we set: help="Locate on map" */
-        button[title="Locate on map"] {
-            width: 34px !important;
-            height: 34px !important;
-            min-width: 34px !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            border-radius: 8px !important;
-
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-
-            font-size: 18px !important;
-            line-height: 1 !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
 
     if st.session_state.view_mode == "single" and st.session_state.selected_bbl is not None:
         sel_bbl = str(st.session_state.selected_bbl)
@@ -564,16 +526,15 @@ with col_list:
             impact = fmt_percent_from_ratio(safe_get(r, "% of New Units Impact", None))
 
             with container:
-                # Make the button column narrower so it doesn't look "floating"
-                header_cols = st.columns([12, 0.45])
-
+                header_cols = st.columns([8, 1])
                 with header_cols[0]:
                     st.markdown(f"**{addr}**  \nNew York, NY {zc}  \n% Impact: {impact}")
-
                 with header_cols[1]:
+                    # Icon-only button to avoid vertical text layout
                     if st.button("📍", key=f"locate_{bbl}", help="Locate on map"):
                         select_property(r)
                         st.rerun()
 
+                # Expander label should not repeat the address
                 with st.expander("Details"):
                     render_detail_two_columns(r)
