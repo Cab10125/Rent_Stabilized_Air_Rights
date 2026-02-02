@@ -32,9 +32,9 @@ if "near_center" not in st.session_state:
     # used for "Top 10 near this property"
     st.session_state.near_center = None
 
-# =============================
+# -----------------------------
 # Global Search (TOP)
-# =============================
+# -----------------------------
 search_mode = st.selectbox("Search by", ["Address", "ZIP Code", "Borough"])
 st.caption("Tip: Use borough abbreviations. MN: Manhattan, BX: Bronx, BK: Brooklyn, QN: Queen")
 search_query = st.text_input("Search", placeholder="Type to search…")
@@ -189,6 +189,9 @@ def render_detail_two_columns(row):
         ("Year Built", fmt_int(safe_get(row, "Year Built", None))),
         ("Zoning District 1", safe_get(row, "Zoning District 1")),
         ("Building Class", safe_get(row, "Building Class")),
+
+        # Requested: keep these two at the bottom
+        ("Existing Number of Floors", fmt_int(safe_get(row, "Existing Number of Floors", None))),
         ("Owner", safe_get(row, "Owner")),
     ]
 
@@ -203,7 +206,7 @@ def select_property(row):
     Both map click and Locate button call this.
     """
     bbl = str(safe_get(row, "BBL", None))
-    if not bbl or bbl == "None" or bbl == "N/A":
+    if not bbl or bbl in ("None", "N/A"):
         return
 
     st.session_state.selected_bbl = bbl
@@ -242,6 +245,173 @@ def extract_clicked_bbl(selection):
 
     return None
 
+def zoom_from_span(span):
+    """
+    Heuristic zoom based on lat/lon span.
+    """
+    if span <= 0.01:
+        return 16
+    if span <= 0.03:
+        return 15
+    if span <= 0.06:
+        return 14
+    if span <= 0.12:
+        return 13
+    if span <= 0.25:
+        return 12
+    return 11
+
+def set_map_view_from_points(df_points, fallback_zoom=12):
+    """
+    Set map center/zoom based on Latitude/Longitude bounds.
+    """
+    if df_points is None or len(df_points) == 0:
+        return
+
+    if "Latitude" not in df_points.columns or "Longitude" not in df_points.columns:
+        return
+
+    lat = pd.to_numeric(df_points["Latitude"], errors="coerce")
+    lon = pd.to_numeric(df_points["Longitude"], errors="coerce")
+    dfv = pd.DataFrame({"lat": lat, "lon": lon}).dropna()
+    if len(dfv) == 0:
+        return
+
+    lat_min, lat_max = dfv["lat"].min(), dfv["lat"].max()
+    lon_min, lon_max = dfv["lon"].min(), dfv["lon"].max()
+    center_lat = (lat_min + lat_max) / 2.0
+    center_lon = (lon_min + lon_max) / 2.0
+
+    span = max(abs(lat_max - lat_min), abs(lon_max - lon_min))
+    z = zoom_from_span(span) if span > 0 else fallback_zoom
+
+    st.session_state.map_center = {"lat": float(center_lat), "lon": float(center_lon), "zoom": int(z)}
+
+def parse_zip_tokens(q):
+    """
+    Extract zip tokens from input.
+    Accepts comma/space separated values.
+    """
+    raw = q.replace(",", " ").split()
+    tokens = []
+    for t in raw:
+        t = "".join([c for c in t if c.isdigit()])
+        if len(t) == 5:
+            tokens.append(t)
+    return list(dict.fromkeys(tokens))
+
+def parse_borough_tokens(q):
+    """
+    Extract borough tokens from input.
+    """
+    raw = q.replace(",", " ").split()
+    tokens = [t.strip().upper() for t in raw if t.strip()]
+    return list(dict.fromkeys(tokens))
+
+def resolve_zip_fallbacks(requested_zips, available_zips_sorted):
+    """
+    Fallback for missing ZIPs:
+    choose closest by numeric difference among available zips.
+    Returns (resolved, replaced_map).
+    """
+    replaced = {}
+    resolved = []
+
+    if len(available_zips_sorted) == 0:
+        return [], {z: None for z in requested_zips}
+
+    avail_int = np.array([int(z) for z in available_zips_sorted], dtype=int)
+
+    for z in requested_zips:
+        zi = int(z)
+        idx = int(np.argmin(np.abs(avail_int - zi)))
+        best = available_zips_sorted[idx]
+        if best != z:
+            replaced[z] = best
+        resolved.append(best)
+
+    # unique preserve order
+    resolved = list(dict.fromkeys(resolved))
+    return resolved, replaced
+
+def filter_for_zip_mode(df, requested_zips):
+    """
+    Apply ZIP filter with fallback rules:
+    - If ZIP not found, fallback to closest available ZIP (numeric).
+    - If ZIP found but all properties are gray (<1%), fallback to closest ZIP that has at least one colored property.
+    Returns (filtered_df, notices).
+    """
+    notices = []
+
+    df = df.copy()
+    df["ZipcodeStr"] = df["Zipcode"].astype(str).str.zfill(5)
+    df["ImpactRatio"] = pd.to_numeric(df["% of New Units Impact"], errors="coerce").fillna(0)
+
+    available_zips = sorted(df["ZipcodeStr"].dropna().unique().tolist())
+    colored_zips = sorted(
+        df.loc[df["ImpactRatio"] >= 0.01, "ZipcodeStr"].dropna().unique().tolist()
+    )
+
+    # First: resolve missing zips against all available zips
+    resolved_zips, replaced_missing = resolve_zip_fallbacks(requested_zips, available_zips)
+
+    # Second: for each resolved zip, if it has no colored property, fallback to closest colored zip
+    final_zips = []
+    replaced_nocolor = {}
+
+    colored_int = np.array([int(z) for z in colored_zips], dtype=int) if len(colored_zips) > 0 else np.array([], dtype=int)
+    for z in resolved_zips:
+        in_zip = df[df["ZipcodeStr"] == z]
+        if len(in_zip) == 0:
+            continue
+        if (in_zip["ImpactRatio"] >= 0.01).any():
+            final_zips.append(z)
+        else:
+            if len(colored_zips) == 0:
+                final_zips.append(z)
+            else:
+                zi = int(z)
+                idx = int(np.argmin(np.abs(colored_int - zi)))
+                best = colored_zips[idx]
+                replaced_nocolor[z] = best
+                final_zips.append(best)
+
+    final_zips = list(dict.fromkeys(final_zips))
+
+    if len(replaced_missing) > 0:
+        items = [f"{k} → {v}" for k, v in replaced_missing.items() if v is not None]
+        if len(items) > 0:
+            notices.append("ZIP not found. Using closest available ZIP instead: " + ", ".join(items))
+
+    if len(replaced_nocolor) > 0:
+        items = [f"{k} → {v}" for k, v in replaced_nocolor.items()]
+        if len(items) > 0:
+            notices.append("ZIP found but no colored properties (<1%). Using closest ZIP with colored properties: " + ", ".join(items))
+
+    if len(final_zips) == 0:
+        return df.iloc[0:0], notices
+
+    filtered = df[df["ZipcodeStr"].isin(final_zips)].copy()
+    return filtered, notices
+
+def filter_for_borough_mode(df, borough_tokens):
+    """
+    Borough abbreviations: MN, BX, BK, QN.
+    Assumes dataset Borough is abbreviation already (as shown in tooltip).
+    """
+    df = df.copy()
+    df["BoroughStr"] = df["Borough"].astype(str).str.upper()
+
+    valid = {"MN", "BX", "BK", "QN"}
+    picked = [b for b in borough_tokens if b in valid]
+    if len(picked) == 0:
+        # Fallback to substring match if user typed full text
+        q = " ".join(borough_tokens).strip().lower()
+        return df[df["Borough"].fillna("").str.lower().str.contains(q, na=False)].copy(), []
+
+    filtered = df[df["BoroughStr"].isin(picked)].copy()
+    return filtered, []
+
 # -----------------------------
 # Load data
 # -----------------------------
@@ -272,6 +442,8 @@ def load_data():
             "ZoneDist1" AS zonedist1,
             "BldgClass" AS bldgclass,
             "OwnerName" AS ownername,
+
+            "# of Floors" AS existing_floors,
 
             "Latitude" AS latitude,
             "Longitude" AS longitude,
@@ -311,6 +483,7 @@ def load_data():
             "zonedist1": "Zoning District 1",
             "bldgclass": "Building Class",
             "ownername": "Owner",
+            "existing_floors": "Existing Number of Floors",
             "latitude": "Latitude",
             "longitude": "Longitude",
         }
@@ -323,20 +496,53 @@ gdf = load_data()
 # Ensure correct dtypes
 gdf["New Units"] = pd.to_numeric(gdf["New Units"], errors="coerce").fillna(0)
 gdf["% of New Units Impact"] = pd.to_numeric(gdf["% of New Units Impact"], errors="coerce").fillna(0)
+gdf["Existing Number of Floors"] = pd.to_numeric(gdf["Existing Number of Floors"], errors="coerce")
 
 # Precompute color by impact
 gdf["impactColor"] = gdf["% of New Units Impact"].apply(impact_to_color)
 
-# Default focus: highest impact property
-try:
-    top_idx = gdf["% of New Units Impact"].astype(float).idxmax()
-    top_row = gdf.loc[top_idx]
-    top_center = get_geojson_center(top_row.get("geom_geojson"))
-    if top_center:
-        if st.session_state.map_center == {"lat": 40.7549, "lon": -73.9840, "zoom": 12}:
-            st.session_state.map_center = {"lat": top_center[0], "lon": top_center[1], "zoom": 15}
-except Exception:
-    pass
+# -----------------------------
+# Build a shared filtered view (used by BOTH map and list) in Top10 mode
+# -----------------------------
+active_df = gdf.copy()
+search_notices = []
+
+if st.session_state.view_mode == "top10" and search_query.strip():
+    q = search_query.strip()
+
+    if search_mode == "Borough":
+        borough_tokens = parse_borough_tokens(q)
+        active_df, notes = filter_for_borough_mode(active_df, borough_tokens)
+        search_notices.extend(notes)
+        # Zoom map to this borough
+        set_map_view_from_points(active_df, fallback_zoom=12)
+
+    elif search_mode == "ZIP Code":
+        zips = parse_zip_tokens(q)
+        active_df, notes = filter_for_zip_mode(active_df, zips)
+        search_notices.extend(notes)
+        # Zoom map to the selected zip(s)
+        set_map_view_from_points(active_df, fallback_zoom=12)
+
+    elif search_mode == "Address":
+        # Keep full map, but list filter will apply later.
+        # Optionally focus map on first match.
+        matches = active_df[active_df["Address"].fillna("").str.lower().str.contains(q.lower(), na=False)]
+        if len(matches) > 0:
+            # Focus around matched points (not filtering the entire map)
+            set_map_view_from_points(matches, fallback_zoom=15)
+
+# Default focus (only if user did not search and did not select)
+if st.session_state.view_mode == "top10" and (not search_query.strip()):
+    try:
+        top_idx = gdf["% of New Units Impact"].astype(float).idxmax()
+        top_row = gdf.loc[top_idx]
+        top_center = get_geojson_center(top_row.get("geom_geojson"))
+        if top_center:
+            if st.session_state.map_center == {"lat": 40.7549, "lon": -73.9840, "zoom": 12}:
+                st.session_state.map_center = {"lat": top_center[0], "lon": top_center[1], "zoom": 15}
+    except Exception:
+        pass
 
 # -----------------------------
 # Main layout
@@ -354,7 +560,10 @@ with col_map:
         st.session_state.view_mode = "top10"
         st.session_state.near_center = None
 
-    gdf_map = gdf.copy()
+    # Map uses filtered dataset for Borough/ZIP searches in Top10 mode
+    map_df = active_df.copy() if st.session_state.view_mode == "top10" else gdf.copy()
+
+    gdf_map = map_df.copy()
     gdf_map["BBL"] = gdf_map["BBL"].astype(str)
 
     gdf_map["AddressName"] = gdf_map["Address"].fillna("N/A")
@@ -365,6 +574,11 @@ with col_map:
     gdf_map["NewUnitsNum"] = pd.to_numeric(gdf_map["New Units"], errors="coerce").fillna(0).astype(int)
     gdf_map["NewFloorsNum"] = pd.to_numeric(gdf_map["New Floors"], errors="coerce").fillna(0)
     gdf_map["NewHeightNum"] = pd.to_numeric(gdf_map["New Building Height"], errors="coerce").fillna(0)
+
+    gdf_map["ExistingFloorsNum"] = pd.to_numeric(
+        gdf_map["Existing Number of Floors"], errors="coerce"
+    ).fillna(np.nan)
+    gdf_map["OwnerNameStr"] = gdf_map["Owner"].fillna("N/A")
 
     gdf_map["fillColor"] = gdf_map.apply(get_color_with_selection, axis=1)
 
@@ -414,14 +628,15 @@ with col_map:
             <b>% Impact:</b> {ImpactPctStr}<br/>
             <b>New Units:</b> {NewUnitsNum}<br/>
             <b>New Floors:</b> {NewFloorsNum}<br/>
-            <b>New Building Height:</b> {NewHeightNum}
+            <b>New Building Height:</b> {NewHeightNum}<br/>
+            <b>Existing Number of Floors:</b> {ExistingFloorsNum}<br/>
+            <b>Owner:</b> {OwnerNameStr}
             """,
             "style": {"backgroundColor": "black", "color": "white", "fontSize": "12px", "padding": "8px"},
         },
         map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
     )
 
-    # Enable selection for map click (version dependent)
     chart = st.pydeck_chart(
         deck,
         use_container_width=True,
@@ -438,6 +653,7 @@ with col_map:
             match = gdf[gdf["BBL"].astype(str) == clicked_bbl]
             if len(match) > 0:
                 select_property(match.iloc[0])
+                st.rerun()
     except Exception:
         pass
 
@@ -446,6 +662,45 @@ with col_map:
 # =============================
 with col_list:
     st.subheader("Property List")
+
+    # CSS: Stabilize the "Locate on map" button to avoid weird spacing
+    # Target only locate buttons by title attribute.
+    st.markdown(
+        """
+        <style>
+        button[title="Locate on map"] {
+            width: 34px !important;
+            height: 34px !important;
+            min-width: 34px !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border-radius: 8px !important;
+
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+
+            font-size: 18px !important;
+            line-height: 1 !important;
+        }
+
+        button[title="Locate on map"] span {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Show notices for ZIP fallbacks
+    for msg in search_notices:
+        st.warning(msg)
 
     if st.session_state.view_mode == "single" and st.session_state.selected_bbl is not None:
         sel_bbl = str(st.session_state.selected_bbl)
@@ -483,23 +738,13 @@ with col_list:
             render_detail_two_columns(row)
 
     else:
-        filtered = gdf.copy()
+        # List uses the same filtered dataset as the map (Top10 mode)
+        filtered = active_df.copy()
 
-        # Search filtering
-        if search_query:
+        # Address search should filter list results even if map is not filtered
+        if search_query.strip() and search_mode == "Address":
             q = search_query.strip().lower()
-
-            if search_mode == "Address":
-                filtered = filtered[filtered["Address"].fillna("").str.lower().str.contains(q, na=False)]
-
-            elif search_mode == "ZIP Code":
-                tokens = [t for t in q.replace(",", " ").split() if t]
-                if len(tokens) > 0:
-                    z = filtered["Zipcode"].astype(str).str.zfill(5)
-                    filtered = filtered[z.isin([t.zfill(5) for t in tokens])]
-
-            elif search_mode == "Borough":
-                filtered = filtered[filtered["Borough"].fillna("").str.lower().str.contains(q, na=False)]
+            filtered = filtered[filtered["Address"].fillna("").str.lower().str.contains(q, na=False)]
 
         # Optional "near center" filter
         if st.session_state.use_map_filter and st.session_state.near_center is not None:
@@ -526,15 +771,16 @@ with col_list:
             impact = fmt_percent_from_ratio(safe_get(r, "% of New Units Impact", None))
 
             with container:
-                header_cols = st.columns([8, 1])
+                # Make the button column narrow to avoid "floating" look
+                header_cols = st.columns([12, 0.6], gap="small")
+
                 with header_cols[0]:
                     st.markdown(f"**{addr}**  \nNew York, NY {zc}  \n% Impact: {impact}")
+
                 with header_cols[1]:
-                    # Icon-only button to avoid vertical text layout
                     if st.button("📍", key=f"locate_{bbl}", help="Locate on map"):
                         select_property(r)
                         st.rerun()
 
-                # Expander label should not repeat the address
                 with st.expander("Details"):
                     render_detail_two_columns(r)
