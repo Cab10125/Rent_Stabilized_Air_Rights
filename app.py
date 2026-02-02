@@ -180,10 +180,6 @@ def render_detail_two_columns(row):
         ("New Building Height", fmt_height(safe_get(row, "New Building Height", None))),
         ("Air Rights", fmt_area_sqft(safe_get(row, "Air Rights", None))),
 
-        # Newly added
-        ("Existing Number of Floors", fmt_int(safe_get(row, "Existing Number of Floors", None))),
-        ("Owner", safe_get(row, "Owner")),
-
         ("Residential Area", fmt_area_sqft(safe_get(row, "Residential Area", None))),
         ("Commercial Area", fmt_area_sqft(safe_get(row, "Commercial Area", None))),
         ("Units Residential", fmt_int(safe_get(row, "Units Residential", None))),
@@ -193,6 +189,10 @@ def render_detail_two_columns(row):
         ("Year Built", fmt_int(safe_get(row, "Year Built", None))),
         ("Zoning District 1", safe_get(row, "Zoning District 1")),
         ("Building Class", safe_get(row, "Building Class")),
+
+        # Moved to the bottom (requested)
+        ("Existing Number of Floors", fmt_int(safe_get(row, "Existing Number of Floors", None))),
+        ("Owner", safe_get(row, "Owner")),
     ]
 
     col1, col2 = st.columns(2)
@@ -373,7 +373,6 @@ with col_map:
     gdf_map["NewFloorsNum"] = pd.to_numeric(gdf_map["New Floors"], errors="coerce").fillna(0)
     gdf_map["NewHeightNum"] = pd.to_numeric(gdf_map["New Building Height"], errors="coerce").fillna(0)
 
-    # Newly added for tooltip
     gdf_map["ExistingFloorsNum"] = pd.to_numeric(
         gdf_map["Existing Number of Floors"], errors="coerce"
     ).fillna(np.nan)
@@ -425,11 +424,11 @@ with col_map:
             <hr/>
             <b>BBL:</b> {BBL}<br/>
             <b>% Impact:</b> {ImpactPctStr}<br/>
-            <b>Existing Number of Floors:</b> {ExistingFloorsNum}<br/>
-            <b>Owner:</b> {OwnerNameStr}<br/>
             <b>New Units:</b> {NewUnitsNum}<br/>
             <b>New Floors:</b> {NewFloorsNum}<br/>
-            <b>New Building Height:</b> {NewHeightNum}
+            <b>New Building Height:</b> {NewHeightNum}<br/>
+            <b>Existing Number of Floors:</b> {ExistingFloorsNum}<br/>
+            <b>Owner:</b> {OwnerNameStr}
             """,
             "style": {"backgroundColor": "black", "color": "white", "fontSize": "12px", "padding": "8px"},
         },
@@ -461,7 +460,7 @@ with col_map:
 with col_list:
     st.subheader("Property List")
 
-    # CSS: make Locate button compact, right-aligned, and remove extra padding
+    # CSS: make Locate button compact, right-aligned, and visually centered
     st.markdown(
         """
         <style>
@@ -476,6 +475,12 @@ with col_list:
             height: 34px !important;
             min-width: 34px !important;
             border-radius: 8px !important;
+
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            line-height: 1 !important;
+            font-size: 18px !important;
         }
         </style>
         """,
