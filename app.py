@@ -13,6 +13,38 @@ st.set_page_config(page_title="NYC Air Rights Explorer", layout="wide")
 st.title("NYC Air Rights Explorer")
 
 # -----------------------------
+# Minimal UI styles (fix bold + card look)
+# -----------------------------
+st.markdown(
+    """
+    <style>
+      .card-title{
+        font-size: 22px;
+        font-weight: 800;
+        color: #111827;
+        line-height: 1.1;
+        margin: 2px 0 6px 0;
+      }
+      .card-sub{
+        font-size: 16px;
+        color: #374151;
+        margin: 0 0 8px 0;
+      }
+      .card-metric{
+        font-size: 16px;
+        color: #111827;
+        margin: 0 0 4px 0;
+      }
+      /* Make expander header look cleaner */
+      div[data-testid="stExpander"] > details{
+        border-radius: 12px;
+      }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# -----------------------------
 # Session state
 # -----------------------------
 if "selected_bbl" not in st.session_state:
@@ -77,7 +109,6 @@ def fmt_height(x):
 def fmt_area_sqft(x):
     if x is None or (isinstance(x, float) and pd.isna(x)):
         return "N/A"
-    # If already a string like "24726 sqft", keep it.
     if isinstance(x, str):
         s = x.strip()
         return s if s else "N/A"
@@ -189,7 +220,6 @@ def render_detail_two_columns(row):
         ("Zoning District 1", safe_get(row, "Zoning District 1")),
         ("Building Class", safe_get(row, "Building Class")),
 
-        # Requested at the bottom
         ("Existing Number of Floors", fmt_int(safe_get(row, "Existing Number of Floors", None))),
         ("Owner", safe_get(row, "Owner")),
     ]
@@ -243,6 +273,31 @@ def extract_clicked_bbl(selection):
                     return props.get("BBL")
 
     return None
+
+def locate_icon_link(bbl: str) -> str:
+    # 32x32 rounded square + inline SVG red pin
+    return f"""
+    <div style="display:flex; justify-content:flex-end; align-items:flex-start;">
+      <a href="?locate={bbl}"
+         title="Locate on map"
+         style="
+            width:32px; height:32px;
+            display:flex; align-items:center; justify-content:center;
+            border:1px solid #e5e7eb;
+            border-radius:8px;
+            background:#ffffff;
+            text-decoration:none;
+            box-shadow:0 1px 0 rgba(0,0,0,0.02);
+         ">
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#d22"
+                d="M12 22s7-7.2 7-12.2C19 6 16.1 3 12 3S5 6 5 9.8C5 14.8 12 22 12 22z"/>
+          <circle cx="12" cy="9.8" r="2.5" fill="#ffffff"/>
+          <circle cx="12" cy="9.8" r="1.2" fill="#d22"/>
+        </svg>
+      </a>
+    </div>
+    """
 
 # -----------------------------
 # Load data
@@ -324,6 +379,32 @@ def load_data():
     return df
 
 gdf = load_data()
+
+# -----------------------------
+# Handle locate click via query params (HTML link)
+# -----------------------------
+def _get_query_param(name: str):
+    try:
+        return st.query_params.get(name)
+    except Exception:
+        qp = st.experimental_get_query_params()
+        v = qp.get(name, [None])
+        return v[0] if isinstance(v, list) else v
+
+def _clear_query_params():
+    try:
+        st.query_params.clear()
+    except Exception:
+        st.experimental_set_query_params()
+
+locate_bbl = _get_query_param("locate")
+if locate_bbl:
+    locate_bbl = str(locate_bbl)
+    match = gdf[gdf["BBL"].astype(str) == locate_bbl]
+    if len(match) > 0:
+        select_property(match.iloc[0])
+    _clear_query_params()
+    st.rerun()
 
 # Ensure correct dtypes
 gdf["New Units"] = pd.to_numeric(gdf["New Units"], errors="coerce").fillna(0)
@@ -429,7 +510,12 @@ with col_map:
             <b>Existing Number of Floors:</b> {ExistingFloorsNum}<br/>
             <b>Owner:</b> {OwnerNameStr}
             """,
-            "style": {"backgroundColor": "black", "color": "white", "fontSize": "12px", "padding": "8px"},
+            "style": {
+                "backgroundColor": "black",
+                "color": "white",
+                "fontSize": "12px",
+                "padding": "8px",
+            },
         },
         map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
     )
@@ -539,18 +625,15 @@ with col_list:
             impact = fmt_percent_from_ratio(safe_get(r, "% of New Units Impact", None))
 
             with container:
-                header_cols = st.columns([14, 0.8])
+                header_cols = st.columns([14, 1.2])
+
                 with header_cols[0]:
-                    # Use HTML for stable bold (prevents literal **stars** rendering)
                     st.markdown(f'<div class="card-title">{addr}</div>', unsafe_allow_html=True)
                     st.markdown(f'<div class="card-sub">New York, NY {zc}</div>', unsafe_allow_html=True)
                     st.markdown(f'<div class="card-metric">% Impact: {impact}</div>', unsafe_allow_html=True)
 
                 with header_cols[1]:
-                    if st.button("📍", key=f"locate_{bbl}", help="Locate on map"):
-                        select_property(r)
-                        st.rerun()
-
+                    st.markdown(locate_icon_link(bbl), unsafe_allow_html=True)
 
                 with st.expander("Details"):
                     render_detail_two_columns(r)
