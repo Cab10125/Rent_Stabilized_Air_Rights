@@ -190,7 +190,7 @@ def render_detail_two_columns(row):
         ("Zoning District 1", safe_get(row, "Zoning District 1")),
         ("Building Class", safe_get(row, "Building Class")),
 
-        # Moved to the bottom (requested)
+        # Requested: keep these two at the bottom
         ("Existing Number of Floors", fmt_int(safe_get(row, "Existing Number of Floors", None))),
         ("Owner", safe_get(row, "Owner")),
     ]
@@ -460,45 +460,25 @@ with col_map:
 with col_list:
     st.subheader("Property List")
 
-    # CSS: make Locate button compact, right-aligned, and visually centered
+    # CSS: Style ONLY the locate buttons via the "help" tooltip (title attribute)
     st.markdown(
         """
         <style>
-        .locate-wrap {
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-        }
-    
-        /* Force the Streamlit button to be a compact square */
-        .locate-wrap div[data-testid="stButton"] > button {
+        /* Only target buttons with the tooltip title we set: help="Locate on map" */
+        button[title="Locate on map"] {
             width: 34px !important;
             height: 34px !important;
             min-width: 34px !important;
-    
             padding: 0 !important;
             margin: 0 !important;
-    
             border-radius: 8px !important;
-    
-            /* Hide the original label (a space) */
-            font-size: 0 !important;
-            line-height: 0 !important;
-    
-            /* Create a stable centering context */
-            position: relative !important;
-        }
-    
-        /* Draw the pin as a pseudo-element and center it perfectly */
-        .locate-wrap div[data-testid="stButton"] > button::before {
-            content: "📍";
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-    
-            font-size: 18px;
-            line-height: 1;
+
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+
+            font-size: 18px !important;
+            line-height: 1 !important;
         }
         </style>
         """,
@@ -584,16 +564,16 @@ with col_list:
             impact = fmt_percent_from_ratio(safe_get(r, "% of New Units Impact", None))
 
             with container:
-                header_cols = st.columns([12, 0.9])
+                # Make the button column narrower so it doesn't look "floating"
+                header_cols = st.columns([12, 0.45])
+
                 with header_cols[0]:
                     st.markdown(f"**{addr}**  \nNew York, NY {zc}  \n% Impact: {impact}")
 
                 with header_cols[1]:
-                    st.markdown('<div class="locate-wrap">', unsafe_allow_html=True)
-                    if st.button(" ", key=f"locate_{bbl}", help="Locate on map"):
+                    if st.button("📍", key=f"locate_{bbl}", help="Locate on map"):
                         select_property(r)
                         st.rerun()
-                    st.markdown("</div>", unsafe_allow_html=True)
 
                 with st.expander("Details"):
                     render_detail_two_columns(r)
