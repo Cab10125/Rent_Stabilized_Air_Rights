@@ -187,6 +187,7 @@ def render_detail_two_columns(row):
         ("Units Total", fmt_int(safe_get(row, "Units Total", None))),
 
         ("Year Built", fmt_int(safe_get(row, "Year Built", None))),
+        ("Existing Floors", fmt_int(safe_get(row, "Number of Existing Floors", None))),
         ("Zoning District 1", safe_get(row, "Zoning District 1")),
         ("Building Class", safe_get(row, "Building Class")),
         ("Owner", safe_get(row, "Owner")),
@@ -272,6 +273,7 @@ def load_data():
             "ZoneDist1" AS zonedist1,
             "BldgClass" AS bldgclass,
             "OwnerName" AS ownername,
+            "NumFloors" AS existing_floors,
 
             "Latitude" AS latitude,
             "Longitude" AS longitude,
@@ -311,6 +313,7 @@ def load_data():
             "zonedist1": "Zoning District 1",
             "bldgclass": "Building Class",
             "ownername": "Owner",
+            "existing_floors": "Number of Existing Floors",
             "latitude": "Latitude",
             "longitude": "Longitude",
         }
@@ -365,6 +368,9 @@ with col_map:
     gdf_map["NewUnitsNum"] = pd.to_numeric(gdf_map["New Units"], errors="coerce").fillna(0).astype(int)
     gdf_map["NewFloorsNum"] = pd.to_numeric(gdf_map["New Floors"], errors="coerce").fillna(0)
     gdf_map["NewHeightNum"] = pd.to_numeric(gdf_map["New Building Height"], errors="coerce").fillna(0)
+    gdf_map["ExistingFloorsNum"] = pd.to_numeric(gdf_map[" Number of Existing Floors"], errors="coerce").fillna(0).astype(int)
+    gdf_map["OwnerStr"] = gdf_map["Owner"].fillna("N/A")
+
 
     gdf_map["fillColor"] = gdf_map.apply(get_color_with_selection, axis=1)
 
@@ -415,6 +421,8 @@ with col_map:
             <b>New Units:</b> {NewUnitsNum}<br/>
             <b>New Floors:</b> {NewFloorsNum}<br/>
             <b>New Building Height:</b> {NewHeightNum}
+            <br/><b>Existing Floors:</b> {ExistingFloorsNum}
+            <br/><b>Owner:</b> {OwnerStr}
             """,
             "style": {"backgroundColor": "black", "color": "white", "fontSize": "12px", "padding": "8px"},
         },
@@ -530,10 +538,14 @@ with col_list:
                 with header_cols[0]:
                     st.markdown(f"**{addr}**  \nNew York, NY {zc}  \n% Impact: {impact}")
                 with header_cols[1]:
-                    # Icon-only button to avoid vertical text layout
+                    st.markdown(
+                        "<div style='display:flex; justify-content:flex-end;'>",
+                        unsafe_allow_html=True
+                    )
                     if st.button("📍", key=f"locate_{bbl}", help="Locate on map"):
                         select_property(r)
                         st.rerun()
+                    st.markdown("</div>", unsafe_allow_html=True)
 
                 # Expander label should not repeat the address
                 with st.expander("Details"):
