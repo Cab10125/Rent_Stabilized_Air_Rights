@@ -755,44 +755,60 @@ with col_map:
 with col_list:
     st.subheader("Property List")
 
-    # CSS: force Locate button to be a compact square, truly centered
-    # Use title attribute to target only locate buttons
+    # CSS: stable Locate icon (pin) centered with ::before
     st.markdown(
         """
         <style>
-        button[title="Locate on map"] {
-            width: 32px !important;
-            height: 32px !important;
-            min-width: 32px !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            border-radius: 8px !important;
-
-            display: inline-flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-
-            font-size: 18px !important;
-            line-height: 1 !important;
-            text-align: center !important;
-            letter-spacing: 0 !important;
-
-            font-family: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif !important;
+        /* Scope ONLY locate buttons by the wrapper class */
+        .locate-wrap {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
         }
-
-        button[title="Locate on map"] span {
+    
+        .locate-wrap div[data-testid="stButton"] {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+        }
+    
+        .locate-wrap div[data-testid="stButton"] > button {
+            width: 34px !important;
+            height: 34px !important;
+            min-width: 34px !important;
+    
+            padding: 0 !important;
+            margin: 0 !important;
+    
+            border-radius: 10px !important;
+    
+            /* Hide label text completely */
+            font-size: 0 !important;
+            line-height: 0 !important;
+    
+            /* Make ::before centering reliable */
+            position: relative !important;
             display: inline-flex !important;
             align-items: center !important;
             justify-content: center !important;
-            width: 100% !important;
-            height: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
+        }
+    
+        /* Draw the pin in the exact center */
+        .locate-wrap div[data-testid="stButton"] > button::before {
+            content: "📍";
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+    
+            font-size: 18px;
+            line-height: 1;
         }
         </style>
         """,
         unsafe_allow_html=True
     )
+
 
     for msg in search_notices:
         st.warning(msg)
@@ -866,10 +882,12 @@ with col_list:
                     st.markdown(f"**{addr}**  \nNew York, NY {zc}  \n% Impact: {impact}")
 
                 with header_cols[1]:
-                    # Use a different icon to avoid emoji baseline/spacing issues
-                    if st.button("📌", key=f"locate_{bbl}", help="Locate on map"):
+                    st.markdown('<div class="locate-wrap">', unsafe_allow_html=True)
+                    if st.button(" ", key=f"locate_{bbl}", help="Locate on map"):
                         select_property(r)
                         st.rerun()
+                    st.markdown("</div>", unsafe_allow_html=True)
+
 
                 with st.expander("Details"):
                     render_detail_two_columns(r)
