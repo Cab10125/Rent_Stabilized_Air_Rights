@@ -222,7 +222,7 @@ def render_detail_two_columns(row):
         ("Residential Area", fmt_area_sqft(safe_get(row, "Residential Area", None))),
         ("Commercial Area", fmt_area_sqft(safe_get(row, "Commercial Area", None))),
         ("Units Residential", fmt_int(safe_get(row, "Units Residential", None))),
-        ("Stabilized Units Number", fmt_int(safe_get(row, "Stabilized Units", None))),
+        ("Stabilized Units", fmt_int(safe_get(row, "Stabilized Units", None))),
         ("% Stabilized", fmt_percent_from_value(safe_get(row, "% Stabilized", None))),
         ("Units Commercial", fmt_int(safe_get(row, "Units Commercial", None))),
         ("Units Total", fmt_int(safe_get(row, "Units Total", None))),
@@ -536,8 +536,8 @@ with col_map:
             <b>New Floors:</b> {NewFloorsNum}<br/>
             <b>New Building Height:</b> {NewHeightNum}<br/>
             <b>Existing Number of Floors:</b> {ExistingFloorsNum}<br/>
-            <b>Stabilized Units Number:</b> {StabilizedUnitsNum}<br/>
             <b>Residential Units:</b> {ResidentialUnitsNum}<br/>
+            <b>Stabilized Units:</b> {StabilizedUnitsNum}<br/>
             <b>Owner:</b> {OwnerNameStr}
             """,
             "style": {
