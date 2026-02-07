@@ -13,7 +13,7 @@ st.set_page_config(page_title="NYC Air Rights Explorer", layout="wide")
 st.title("NYC Air Rights Explorer")
 
 # -----------------------------
-# Minimal UI styles (fix bold + card look)
+# Minimal UI styles
 # -----------------------------
 st.markdown(
     """
@@ -35,7 +35,6 @@ st.markdown(
         color: #111827;
         margin: 0 0 4px 0;
       }
-      /* Make expander header look cleaner */
       div[data-testid="stExpander"] > details{
         border-radius: 12px;
       }
@@ -57,11 +56,9 @@ if "use_map_filter" not in st.session_state:
     st.session_state.use_map_filter = False
 
 if "view_mode" not in st.session_state:
-    # "top10" or "single"
-    st.session_state.view_mode = "top10"
+    st.session_state.view_mode = "top10"  # "top10" or "single"
 
 if "near_center" not in st.session_state:
-    # used for "Top 10 near this property"
     st.session_state.near_center = None
 
 # =============================
@@ -126,12 +123,23 @@ def fmt_percent_from_ratio(ratio):
     except Exception:
         return "N/A"
 
+def fmt_percent_auto(x):
+    """
+    Robust percent formatter:
+    - if 0~1.5 -> treat as ratio (0.25 -> 25%)
+    - if >1.5 -> treat as already percent (25 -> 25%)
+    """
+    if x is None or (isinstance(x, float) and pd.isna(x)):
+        return "N/A"
+    try:
+        v = float(x)
+        if v <= 1.5:
+            return f"{int(round(v * 100))}%"
+        return f"{int(round(v))}%"
+    except Exception:
+        return "N/A"
+
 def get_geojson_center(geom_geojson):
-    """
-    Return (lat, lon) focus point from GeoJSON string.
-    Supports Polygon and MultiPolygon.
-    Uses first coordinate as a stable proxy for focus.
-    """
     try:
         geom = json.loads(geom_geojson)
         if geom["type"] == "Polygon":
@@ -144,37 +152,27 @@ def get_geojson_center(geom_geojson):
         return None
 
 def impact_to_color(impact_ratio):
-    """
-    Color buckets:
-      1% - 30%    -> green
-      30% - 60%   -> yellow
-      60% - 100%  -> orange
-      100% - 150% -> light red
-      150%+       -> deep red
-    impact_ratio is stored as 0.92 for 92%.
-    """
     try:
         pct = float(impact_ratio) * 100.0
     except Exception:
-        return [200, 200, 200]  # fallback gray
+        return [200, 200, 200]
 
     if pct < 1:
         return [200, 200, 200]
     if pct < 30:
-        return [0, 170, 0]        # green
+        return [0, 170, 0]
     if pct < 60:
-        return [245, 200, 0]      # yellow
+        return [245, 200, 0]
     if pct < 100:
-        return [255, 140, 0]      # orange
+        return [255, 140, 0]
     if pct < 150:
-        return [255, 90, 90]      # light red
-    return [180, 0, 0]            # deep red
+        return [255, 90, 90]
+    return [180, 0, 0]
 
 def get_color_with_selection(row):
-    # Selected building -> highlight
     if st.session_state.selected_bbl is not None:
         if str(row.get("BBL", "")) == str(st.session_state.selected_bbl):
-            return [0, 120, 255]  # highlight blue
+            return [0, 120, 255]
     return row.get("impactColor", [200, 200, 200])
 
 def info_row(label, value):
@@ -183,21 +181,14 @@ def info_row(label, value):
     st.markdown(
         f"""
         <div style="margin: 6px 0 14px 0;">
-            <div style="font-size: 13px; color: #6b7280;">
-                {label}
-            </div>
-            <div style="font-size: 16px; font-weight: 600; color: #111827;">
-                {value}
-            </div>
+            <div style="font-size: 13px; color: #6b7280;">{label}</div>
+            <div style="font-size: 16px; font-weight: 600; color: #111827;">{value}</div>
         </div>
         """,
         unsafe_allow_html=True
     )
 
 def render_detail_two_columns(row):
-    """
-    Render all details in two columns.
-    """
     fields = [
         ("Address", safe_get(row, "Address")),
         ("Borough", safe_get(row, "Borough")),
@@ -216,6 +207,10 @@ def render_detail_two_columns(row):
         ("Units Commercial", fmt_int(safe_get(row, "Units Commercial", None))),
         ("Units Total", fmt_int(safe_get(row, "Units Total", None))),
 
+        # NEW: add these two into Details
+        ("Stabilized Units Number", fmt_int(safe_get(row, "Stabilized Units Number", None))),
+        ("% stabilized", fmt_percent_auto(safe_get(row, "% stabilized", None))),
+
         ("Year Built", fmt_int(safe_get(row, "Year Built", None))),
         ("Zoning District 1", safe_get(row, "Zoning District 1")),
         ("Building Class", safe_get(row, "Building Class")),
@@ -230,12 +225,8 @@ def render_detail_two_columns(row):
             info_row(label, value)
 
 def select_property(row):
-    """
-    Single source of truth for selecting a property.
-    Both map click and Locate button call this.
-    """
     bbl = str(safe_get(row, "BBL", None))
-    if not bbl or bbl == "None" or bbl == "N/A":
+    if not bbl or bbl in ["None", "N/A"]:
         return
 
     st.session_state.selected_bbl = bbl
@@ -246,10 +237,6 @@ def select_property(row):
         st.session_state.map_center = {"lat": center[0], "lon": center[1], "zoom": 16}
 
 def extract_clicked_bbl(selection):
-    """
-    Streamlit selection schema can vary by version.
-    This function tries multiple patterns to locate clicked feature properties.
-    """
     if not selection or not isinstance(selection, dict):
         return None
 
@@ -257,13 +244,11 @@ def extract_clicked_bbl(selection):
     if objs is None:
         return None
 
-    # Case A: objects is a list
     if isinstance(objs, list) and len(objs) > 0:
         obj0 = objs[0]
         props = obj0.get("properties", obj0)
         return props.get("BBL")
 
-    # Case B: objects is a dict keyed by layer id
     if isinstance(objs, dict):
         for _, v in objs.items():
             if isinstance(v, list) and len(v) > 0:
@@ -275,7 +260,6 @@ def extract_clicked_bbl(selection):
     return None
 
 def locate_icon_link(bbl: str) -> str:
-    # 32x32 rounded square + inline SVG red pin
     return f"""
     <div style="display:flex; justify-content:flex-end; align-items:flex-start;">
       <a href="?locate={bbl}"
@@ -332,6 +316,10 @@ def load_data():
 
             "# of Floors" AS existing_floors,
 
+            -- NEW columns (exact DB names)
+            "stabilized units" AS stabilized_units,
+            "% stabilized" AS pct_stabilized,
+
             "Latitude" AS latitude,
             "Longitude" AS longitude,
 
@@ -371,6 +359,8 @@ def load_data():
             "bldgclass": "Building Class",
             "ownername": "Owner",
             "existing_floors": "Existing Number of Floors",
+            "stabilized_units": "Stabilized Units Number",
+            "pct_stabilized": "% stabilized",
             "latitude": "Latitude",
             "longitude": "Longitude",
         }
@@ -381,7 +371,7 @@ def load_data():
 gdf = load_data()
 
 # -----------------------------
-# Handle locate click via query params (HTML link)
+# Handle locate click via query params
 # -----------------------------
 def _get_query_param(name: str):
     try:
@@ -410,6 +400,12 @@ if locate_bbl:
 gdf["New Units"] = pd.to_numeric(gdf["New Units"], errors="coerce").fillna(0)
 gdf["% of New Units Impact"] = pd.to_numeric(gdf["% of New Units Impact"], errors="coerce").fillna(0)
 gdf["Existing Number of Floors"] = pd.to_numeric(gdf["Existing Number of Floors"], errors="coerce")
+
+# NEW dtypes
+if "Stabilized Units Number" in gdf.columns:
+    gdf["Stabilized Units Number"] = pd.to_numeric(gdf["Stabilized Units Number"], errors="coerce").fillna(0)
+if "% stabilized" in gdf.columns:
+    gdf["% stabilized"] = pd.to_numeric(gdf["% stabilized"], errors="coerce")
 
 # Precompute color by impact
 gdf["impactColor"] = gdf["% of New Units Impact"].apply(impact_to_color)
@@ -456,8 +452,18 @@ with col_map:
     gdf_map["ExistingFloorsNum"] = pd.to_numeric(
         gdf_map["Existing Number of Floors"], errors="coerce"
     ).fillna(np.nan)
-    gdf_map["OwnerNameStr"] = gdf_map["Owner"].fillna("N/A")
 
+    # NEW tooltip numbers
+    gdf_map["StabilizedUnitsNum"] = pd.to_numeric(
+        gdf_map.get("Stabilized Units Number", 0), errors="coerce"
+    ).fillna(0).astype(int)
+
+    # Residential units = your existing "Units Residential"
+    gdf_map["ResidentialUnitsNum"] = pd.to_numeric(
+        gdf_map.get("Units Residential", np.nan), errors="coerce"
+    ).fillna(np.nan)
+
+    gdf_map["OwnerNameStr"] = gdf_map.get("Owner", "N/A").fillna("N/A")
     gdf_map["fillColor"] = gdf_map.apply(get_color_with_selection, axis=1)
 
     features = []
@@ -508,6 +514,8 @@ with col_map:
             <b>New Floors:</b> {NewFloorsNum}<br/>
             <b>New Building Height:</b> {NewHeightNum}<br/>
             <b>Existing Number of Floors:</b> {ExistingFloorsNum}<br/>
+            <b>Stabilized Units Number:</b> {StabilizedUnitsNum}<br/>
+            <b>Residential Units:</b> {ResidentialUnitsNum}<br/>
             <b>Owner:</b> {OwnerNameStr}
             """,
             "style": {
@@ -527,7 +535,6 @@ with col_map:
         selection_mode="single-object",
     )
 
-    # Make map click behave exactly like Locate
     try:
         sel = getattr(chart, "selection", None)
         clicked_bbl = extract_clicked_bbl(sel)
@@ -584,7 +591,6 @@ with col_list:
     else:
         filtered = gdf.copy()
 
-        # Search filtering
         if search_query:
             q = search_query.strip().lower()
 
@@ -600,7 +606,6 @@ with col_list:
             elif search_mode == "Borough":
                 filtered = filtered[filtered["Borough"].fillna("").str.lower().str.contains(q, na=False)]
 
-        # Optional "near center" filter
         if st.session_state.use_map_filter and st.session_state.near_center is not None:
             lat0, lon0 = st.session_state.near_center
             if "Latitude" in filtered.columns and "Longitude" in filtered.columns:
