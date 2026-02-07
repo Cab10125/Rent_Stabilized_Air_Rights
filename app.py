@@ -426,6 +426,12 @@ gdf["New Units"] = pd.to_numeric(gdf["New Units"], errors="coerce").fillna(0)
 gdf["% of New Units Impact"] = pd.to_numeric(gdf["% of New Units Impact"], errors="coerce").fillna(0)
 gdf["Existing Number of Floors"] = pd.to_numeric(gdf["Existing Number of Floors"], errors="coerce")
 gdf["Stabilized Units"] = pd.to_numeric(gdf["Stabilized Units"], errors="coerce")
+gdf["% Stabilized"] = (
+    gdf["% Stabilized"]
+    .astype(str)
+    .str.replace("%", "", regex=False)
+    .str.strip()
+)
 gdf["% Stabilized"] = pd.to_numeric(gdf["% Stabilized"], errors="coerce")
 
 # Precompute color by impact
